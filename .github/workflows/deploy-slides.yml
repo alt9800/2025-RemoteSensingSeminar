@@ -8,6 +8,11 @@ on:
       - '*/assets/**'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -287,4 +292,4 @@ jobs:
         run: |
           echo "## ℹ️ 変更なし" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "セミナー資料に関連する変更は検出されませんでした。" >> $GITHUB_STEP_SUMMARYs
+          echo "セミナー資料に関連する変更は検出されませんでした。" >> $GITHUB_STEP_SUMMARY
