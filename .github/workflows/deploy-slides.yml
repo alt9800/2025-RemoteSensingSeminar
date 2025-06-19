@@ -35,6 +35,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Japanese fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
+          # フォントキャッシュを更新
+          fc-cache -fv
+
       - name: Install Marp CLI
         run: npm install -g @marp-team/marp-cli
 
@@ -75,21 +82,55 @@ jobs:
             if [ -n "$DATE_DIR" ] && [ -d "$DATE_DIR" ]; then
               echo "Processing $DATE_DIR..."
               
+              # assetsディレクトリをdocs/slides/にコピー（画像用）
+              if [ -d "$DATE_DIR/assets" ]; then
+                echo "Copying assets for $DATE_DIR"
+                mkdir -p "docs/slides/assets"
+                cp -r "$DATE_DIR/assets"/* "docs/slides/assets/"
+                # もしくは日付別のassetsディレクトリを作成
+                mkdir -p "docs/slides/$DATE_DIR-assets"
+                cp -r "$DATE_DIR/assets"/* "docs/slides/$DATE_DIR-assets/"
+              fi
+              
+              # 同じディレクトリの画像ファイルもコピー
+              find "$DATE_DIR" -maxdepth 1 \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) | while read img_file; do
+                if [ -f "$img_file" ]; then
+                  echo "Copying image: $img_file"
+                  cp "$img_file" "docs/slides/"
+                  # 日付別ディレクトリにもコピー
+                  mkdir -p "docs/slides/$DATE_DIR-assets"
+                  cp "$img_file" "docs/slides/$DATE_DIR-assets/"
+                fi
+              done
+              
               # スライド生成 (slide.mdが存在する場合のみ)
               if [ -f "$DATE_DIR/slide.md" ]; then
                 echo "Generating slides for $DATE_DIR"
                 
-                # HTML生成
-                marp "$DATE_DIR/slide.md" \
+                # 一時的にslide.mdの画像パスを調整したバージョンを作成
+                cp "$DATE_DIR/slide.md" "temp-slide.md"
+                
+                # 相対パスを調整（HTML用）
+                sed 's|!\[\([^]]*\)\](\([^)]*\))|![\1](./'$DATE_DIR'-assets/\2)|g' "temp-slide.md" > "temp-slide-html.md"
+                # assetsフォルダ内の画像パスも調整
+                sed -i 's|assets/|'$DATE_DIR'-assets/|g' "temp-slide-html.md"
+                
+                # HTML生成（調整されたパス使用）
+                marp "temp-slide-html.md" \
                   --html \
                   --allow-local-files \
                   --output "docs/slides/$DATE_DIR.html"
                 
-                # PDF生成
-                marp "$DATE_DIR/slide.md" \
+                # PDF生成（元のパス使用、workdir変更）
+                cd "$DATE_DIR"
+                marp "slide.md" \
                   --pdf \
                   --allow-local-files \
-                  --output "docs/slides/$DATE_DIR.pdf"
+                  --output "../docs/slides/$DATE_DIR.pdf"
+                cd ..
+                
+                # 一時ファイル削除
+                rm -f "temp-slide.md" "temp-slide-html.md"
                 
                 echo "✅ Generated slides for $DATE_DIR"
               else
