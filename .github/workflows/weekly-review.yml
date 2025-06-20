@@ -18,24 +18,79 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
+      - name: Check if seminar period is active
+        id: period_check
+        run: |
+          CURRENT_DATE=$(date '+%Y%m%d')
+          END_DATE="20250801"
+          
+          if [ $CURRENT_DATE -gt $END_DATE ]; then
+            echo "🛑 セミナー期間終了: $CURRENT_DATE > $END_DATE"
+            echo "period_active=false" >> $GITHUB_OUTPUT
+            
+            # 終了通知用のメッセージを準備
+            echo "end_message=📚 セミナー期間が終了したため、このワークフローは停止されました。お疲れ様でした！" >> $GITHUB_OUTPUT
+          else
+            echo "✅ セミナー期間中: $CURRENT_DATE <= $END_DATE"
+            echo "period_active=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send final notification (if period ended)
+        if: steps.period_check.outputs.period_active == 'false'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"blocks\": [
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"${{ steps.period_check.outputs.end_message }}\"
+                    }
+                  },
+                  {
+                    \"type\": \"context\",
+                    \"elements\": [
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"今後はワークフローを手動で無効化するか、ファイルを削除してください。\"
+                      }
+                    ]
+                  }
+                ]
+              }" \
+              $SLACK_WEBHOOK_URL
+          fi
+          
+          echo "::warning::セミナー期間終了のため、ワークフローを停止してください"
+          exit 0
+
       - name: Checkout repository
+        if: steps.period_check.outputs.period_active == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: steps.period_check.outputs.period_active == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install Japanese fonts
+        if: steps.period_check.outputs.period_active == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
           fc-cache -fv
 
       - name: Install Marp CLI
+        if: steps.period_check.outputs.period_active == 'true'
         run: npm install -g @marp-team/marp-cli
 
       - name: Determine target date
+        if: steps.period_check.outputs.period_active == 'true'
         id: target
         run: |
           if [ -n "${{ github.event.inputs.target_date }}" ]; then
@@ -58,7 +113,7 @@ jobs:
           fi
 
       - name: Generate review PDF
-        if: steps.target.outputs.slide_exists == 'true'
+        if: steps.target.outputs.slide_exists == 'true' && steps.period_check.outputs.period_active == 'true'
         run: |
           TARGET_DATE="${{ steps.target.outputs.target_date }}"
           
@@ -89,6 +144,7 @@ jobs:
           fi
 
       - name: Determine notification method
+        if: steps.period_check.outputs.period_active == 'true'
         id: notification
         run: |
           if [ -n "${{ secrets.SLACK_BOT_TOKEN }}" ] && [ -n "${{ secrets.SLACK_REVIEW_CHANNEL }}" ]; then
@@ -103,7 +159,7 @@ jobs:
           fi
 
       - name: Send Slack notification with PDF (Bot Token)
-        if: steps.target.outputs.slide_exists == 'true' && steps.notification.outputs.method == 'bot' && env.pdf_too_large == 'false'
+        if: steps.target.outputs.slide_exists == 'true' && steps.notification.outputs.method == 'bot' && env.pdf_too_large == 'false' && steps.period_check.outputs.period_active == 'true'
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
@@ -113,12 +169,15 @@ jobs:
           
           # メッセージ内容を変数に格納
           MESSAGE="$CURRENT_TIME 時点での資料はこちらです。レビューをお願いします。
+          
           📋 レビューポイント:
           • 内容の正確性
           • 説明の分かりやすさ  
           • 時間配分
           • スライドデザイン
+          
           💬 フィードバック方法: このスレッドにコメントをお願いします
+          
           よろしくお願いします！"
           
           # PDFをSlackにアップロード
@@ -141,7 +200,7 @@ jobs:
           fi
 
       - name: Send Slack notification with link (Webhook or large PDF)
-        if: steps.target.outputs.slide_exists == 'true' && (steps.notification.outputs.method == 'webhook' || env.pdf_too_large == 'true')
+        if: steps.target.outputs.slide_exists == 'true' && (steps.notification.outputs.method == 'webhook' || env.pdf_too_large == 'true') && steps.period_check.outputs.period_active == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
@@ -196,7 +255,7 @@ jobs:
             $SLACK_WEBHOOK_URL
 
       - name: Send no-slide notification
-        if: steps.target.outputs.slide_exists == 'false' && github.event.inputs.force_send == 'true'
+        if: steps.target.outputs.slide_exists == 'false' && github.event.inputs.force_send == 'true' && steps.period_check.outputs.period_active == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
@@ -238,7 +297,7 @@ jobs:
             $SLACK_WEBHOOK_URL
 
       - name: Send no-configuration warning
-        if: steps.notification.outputs.method == 'none'
+        if: steps.notification.outputs.method == 'none' && steps.period_check.outputs.period_active == 'true'
         run: |
           echo "⚠️ Slack configuration missing!"
           echo ""
