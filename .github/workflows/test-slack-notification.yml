@@ -127,12 +127,12 @@ jobs:
           CURRENT_TIME=$(date '+%Y年%m月%d日 %H:%M JST')
           TEST_MSG="${{ github.event.inputs.test_message }}"
           
-          echo "🤖 Testing Bot Token notification..."
+          echo "🤖 Testing Bot Token notification with files.upload_v2..."
           
-          # メッセージ内容を変数に格納
           MESSAGE="$TEST_MSG - Bot Token テスト
+                  
           $CURRENT_TIME 時点での資料はこちらです。レビューをお願いします。
-          
+                  
           📋 レビューポイント:
           • 内容の正確性
           • 説明の分かりやすさ  
@@ -142,14 +142,14 @@ jobs:
           💬 フィードバック方法: このスレッドにコメントをお願いします
           
           ⚠️ これはテスト通知です"
-          
-          # PDFをSlackにアップロード
+                    
+          # ファイルを直接チャンネルにアップロード
           UPLOAD_RESPONSE=$(curl -F file=@"test-output/test-$TARGET_DATE.pdf" \
-            -F channels="$SLACK_CHANNEL" \
-            -F title="🧪 テスト用スライド ($TARGET_DATE)" \
+            -F filename="test-slide-$TARGET_DATE.pdf" \
+            -F channel="$SLACK_CHANNEL" \
             -F initial_comment="$MESSAGE" \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            https://slack.com/api/files.upload)
+            https://slack.com/api/files.upload_v2)
           
           echo "📤 Upload response: $UPLOAD_RESPONSE"
           
