@@ -175,8 +175,6 @@ https://alt9800.github.io/visualization/prefecture-viewer/
 登壇 
 iOSDC2025 : https://fortee.jp/iosdc-japan-2024/proposal/afbcd097-0da9-4073-8f48-528f007e28b7
 
-
-
 ---
 
 
@@ -537,6 +535,11 @@ OSS開発は常に支援 (スポンサー)を求めています。
 
 ---
 
-Leafletの応用的な使い方
+## Leafletの応用的な使い方
 https://game8.jp/pokemon-legends/424101
 
+
+---
+
+## 拙作の同人誌
+https://github.com/alt9800/Publications/tree/main/getting-started-deckgl
