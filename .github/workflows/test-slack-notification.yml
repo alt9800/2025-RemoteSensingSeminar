@@ -112,13 +112,51 @@ jobs:
           if [ $PDF_SIZE -gt 10485760 ]; then
             echo "⚠️ PDF size exceeds Slack limit (10MB)"
             echo "pdf_too_large=true" >> $GITHUB_ENV
+            echo "テスト用に小さなPDFを生成します..."
+            
+            # テスト用に最初の5ページだけのPDFを生成
+            cd "$TARGET_DATE"
+            # 一時的に短縮版を作成
+            head -50 slide.md > slide_short.md
+            marp "slide_short.md" \
+              --pdf \
+              --allow-local-files \
+              --output "../test-output/test-$TARGET_DATE.pdf"
+            rm slide_short.md
+            cd ..
+            
+            # 新しいサイズをチェック
+            NEW_SIZE=$(stat -c%s "test-output/test-$TARGET_DATE.pdf")
+            echo "📊 Shortened PDF size: $NEW_SIZE bytes"
+            
+            if [ $NEW_SIZE -le 10485760 ]; then
+              echo "✅ Test PDF size OK for Slack"
+              echo "pdf_too_large=false" >> $GITHUB_ENV
+            fi
           else
             echo "✅ PDF size OK for Slack"
             echo "pdf_too_large=false" >> $GITHUB_ENV
           fi
 
+      - name: Debug information
+        if: (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.bot_available == 'true' && steps.target.outputs.slide_exists == 'true'
+        env:
+          SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
+        run: |
+          echo "🔍 Debug information:"
+          echo "  - Bot available: ${{ steps.config.outputs.bot_available }}"
+          echo "  - Slide exists: ${{ steps.target.outputs.slide_exists }}"
+          echo "  - PDF too large: ${{ env.pdf_too_large }}"
+          echo "  - Channel ID: $SLACK_CHANNEL"
+          echo "  - File exists: $([ -f "test-output/test-${{ steps.target.outputs.target_date }}.pdf" ] && echo "YES" || echo "NO")"
+          
+          if [ -f "test-output/test-${{ steps.target.outputs.target_date }}.pdf" ]; then
+            FILE_SIZE=$(stat -c%s "test-output/test-${{ steps.target.outputs.target_date }}.pdf")
+            echo "  - File size: $FILE_SIZE bytes"
+          fi
+
       - name: Test Bot Token notification
-        if: (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.bot_available == 'true' && steps.target.outputs.slide_exists == 'true' && env.pdf_too_large == 'false'
+        if: (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.bot_available == 'true' && steps.target.outputs.slide_exists == 'true'
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
@@ -128,6 +166,15 @@ jobs:
           TEST_MSG="${{ github.event.inputs.test_message }}"
           
           echo "🤖 Testing Bot Token notification with files.upload_v2..."
+          echo "   Target date: $TARGET_DATE"
+          echo "   Channel: $SLACK_CHANNEL"
+          echo "   PDF too large: ${{ env.pdf_too_large }}"
+          
+          # PDFサイズに関係なくテスト実行
+          if [ ! -f "test-output/test-$TARGET_DATE.pdf" ]; then
+            echo "❌ PDF file not found: test-output/test-$TARGET_DATE.pdf"
+            exit 1
+          fi
           
           MESSAGE="$TEST_MSG - Bot Token テスト
                   
@@ -142,23 +189,31 @@ jobs:
           💬 フィードバック方法: このスレッドにコメントをお願いします
           
           ⚠️ これはテスト通知です"
-                    
+          
+          echo "📤 Uploading PDF to Slack..."
+          
           # ファイルを直接チャンネルにアップロード
-          UPLOAD_RESPONSE=$(curl -F file=@"test-output/test-$TARGET_DATE.pdf" \
+          UPLOAD_RESPONSE=$(curl -v -F file=@"test-output/test-$TARGET_DATE.pdf" \
             -F filename="test-slide-$TARGET_DATE.pdf" \
             -F channel="$SLACK_CHANNEL" \
             -F initial_comment="$MESSAGE" \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            https://slack.com/api/files.upload_v2)
+            https://slack.com/api/files.upload_v2 2>&1)
           
-          echo "📤 Upload response: $UPLOAD_RESPONSE"
+          echo "📋 Full upload response:"
+          echo "$UPLOAD_RESPONSE"
           
           # アップロード成功確認
           if echo "$UPLOAD_RESPONSE" | grep -q '"ok":true'; then
             echo "✅ Bot Token test successful!"
           else
             echo "❌ Bot Token test failed"
-            echo "$UPLOAD_RESPONSE"
+            
+            # エラー詳細を抽出
+            ERROR_MSG=$(echo "$UPLOAD_RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+            if [ -n "$ERROR_MSG" ]; then
+              echo "   Error: $ERROR_MSG"
+            fi
           fi
 
       - name: Test Webhook notification

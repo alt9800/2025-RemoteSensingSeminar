@@ -24,6 +24,11 @@ style: |
     .tiny-text {
     font-size: 0.6em;  /* 通常の60%サイズ */
     }
+    img {
+      max-width: 100%;
+      height: auto;
+      image-rendering: -webkit-optimize-contrast;
+    }
 
 
 
@@ -160,7 +165,7 @@ OSGeoJP 運営委員
 
 最近やってること
 LiDARや機械学習による測量支援 / 屋内の地図化ツール/
-点字ブロック Lineデータ作成
+点字ブロック Lineデータ作成 /Web における3D
 
 お仕事
 https://ikominaprj.xsrv.jp/AR/
@@ -348,6 +353,30 @@ Cursorとかでもいいですよ！
 ![w:800](image-editer.png)
 
 ---
+
+<div class="tiny-text">
+補完を強くしておくとよいでしょう。
+
+アクティブなファイル全体をフォーマットする
+(Windows) Shift + Alt + F
+(macOS) Shift + Option + F
+
+
+保存時に自動フォーマットを行う様にしてもいいかもしれません。
+https://qiita.com/shun-shobon/items/3f7b96752022df3a9f57
+
+
+Lintツールなどを入れておき、場合によってはCopilot Chat や Windsorf、 TabnineなどのTransFormar型の支援ツールを入れると良いかもしれません。
+
+言語ごとのインデント幅を設定しておくといいかもしれません。
+htmlは4、JSは2で設定することもあります。
+また、Inline HTML拡張を入れておくとマークアップ中のJSにシンタックスハイライトが適用されます。
+
+</div>
+
+
+---
+
 
 # 15:30-16:00	ハンズオンタイム(データフォーマット)
 
