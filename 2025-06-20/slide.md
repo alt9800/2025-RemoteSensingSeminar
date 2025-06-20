@@ -388,13 +388,15 @@ htmlは4、JSは2で設定することもあります。
 - Leaflet
 - Cesium
 - DeckGL
-
+- OpenLayers
+- Google Maps JavaScript API
+- Mapbox GL JS
+- Potree
 
 ---
 
 
 ## データフォーマット
-
 
 
 ---
@@ -432,6 +434,24 @@ Protocol Buffers (PBF) 形式で圧縮されたデータ
 - MV Tiles / PM Tilesがデファクトになっている
 
 (Google Maps / 地理院地図でもベクター形式は使われている)
+
+
+---
+
+### そのほか
+SHP
+GeoJSON
+TopoJSON
+GPX
+GeoPackage
+GeoParquet
+GeoTIFF 
+Cloud Optimized GeoTIFF 
+3D Tiles
+CityGML
+
+glTF 
+LAS (LAZ)
 
 
 ---
@@ -520,5 +540,3 @@ OSS開発は常に支援 (スポンサー)を求めています。
 Leafletの応用的な使い方
 https://game8.jp/pokemon-legends/424101
 
-
----
