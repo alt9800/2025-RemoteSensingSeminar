@@ -378,21 +378,84 @@ htmlは4、JSは2で設定することもあります。
 ---
 
 
-# 15:30-16:00	ハンズオンタイム(データフォーマット)
+# 15:30-16:00	ハンズオンタイム(データフォーマットまで)
+
+---
+
+## WebGISライブラリ
+
+- Map Libre GL JS
+- Leaflet
+- Cesium
+- DeckGL
+
 
 ---
 
 
+## データフォーマット
+
+
+
+---
+
+
+## ラスタータイル
+ラスタータイルは画像形式のタイルで、地図を小さな正方形の画像に分割して配信する方式。
+
+特徴:
+- PNG、JPEG、WebP形式で提供される
+- ズームレベルごとに異なる解像度の画像が用意される
+- 一般的なタイル座標系 (z/x/y) を使用
+
+
+---
+
+## ベクタータイル
+ベクタータイルは地理データをベクター形式で配信するタイル形式です。
+特徴:
+
+Protocol Buffers (PBF) 形式で圧縮されたデータ
+点、線、ポリゴンなどのベクターデータを含む
+属性情報も含まれるため、動的なスタイリングが可能
+高解像度ディスプレイでも鮮明に表示
+データサイズが小さく、ネットワーク効率が良い
+
+
+
+---
+
+### ベクタータイルについてもう少し詳しく
+
+- JSON形式のスタイルシートで外観をカスタマイズ
+- フィルタリングや条件付きスタイリングが可能
+- MV Tiles / PM Tilesがデファクトになっている
+
+(Google Maps / 地理院地図でもベクター形式は使われている)
+
+
+---
 
 時間調整用
 
 ---
 
 
-情報をどこにとりにいくか
+---
+
+# FOSS4G エコシステム
+
+FOSS4G は Free and Open Source Software for Geospatialの略で、OSGeoがグローバルな共同体として開発や推進活動を支えています。日本ではOSGeoJPが一社として運営されています。
+
+QGISを中心とするデスクトップ/サーバーのGISシステム (GLASS / GDAL)他、Webでの地理空間情報処理を支えるソフトウェアのコントリビュータが多く活動に参加しています。
+
+
 
 ---
 
+Q.情報をどこにとりにいくか
+
+---
 
 <p class="tiny-text">FOSS4Gのイベントについて : <a href="https://www.osgeo.jp/archives/4633">https://www.osgeo.jp/archives/4633 </a></div>
 <div class="tiny-text">
@@ -418,6 +481,31 @@ INADANI SEES（⻑野県伊那市）
 
 ---
 
+## FOSS4G グローバル
+
+2025/11/17 Auckland
+
+2026/08/30 広島
+
+
+---
+
+## 国際カンファレンス
+
+### CloudNative GeoSpatial Conference in Salt Lake
+https://2025-ut.cloudnativegeo.org/
+
+### Spatial Data Science Conference 2025 in London
+https://spatial-data-science-conference.com/2025/london
+
+### International Cartographic Conference (国際地図学会) :  Vancouver 
+https://icaci.org/icc2025/
+
+### SotM Manira 2025
+[2025/10/03-05](https://2025.stateofthemap.org)
+
+---
+
 # 会社様向け
 
 OSS開発は常に支援 (スポンサー)を求めています。
@@ -426,5 +514,11 @@ OSS開発は常に支援 (スポンサー)を求めています。
 もちろん、開発に参加することや広めることも大きな貢献です！
 
 勉強会のお誘いもお気軽に！
+
+---
+
+Leafletの応用的な使い方
+https://game8.jp/pokemon-legends/424101
+
 
 ---
