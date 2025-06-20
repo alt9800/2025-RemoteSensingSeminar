@@ -1,0 +1,321 @@
+name: Test Slack Notification
+on:
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'テスト対象の日付 (YYYY-MM-DD) - 空欄で最新'
+        required: false
+        type: string
+      notification_type:
+        description: 'テストする通知タイプ'
+        required: true
+        type: choice
+        options:
+          - 'bot_with_pdf'
+          - 'webhook_with_links'
+          - 'no_slide_notification'
+          - 'test_all_methods'
+        default: 'test_all_methods'
+      test_message:
+        description: 'テスト識別用メッセージ'
+        required: false
+        type: string
+        default: '🧪 Slack通知テスト'
+
+jobs:
+  test-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Japanese fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
+          fc-cache -fv
+
+      - name: Install Marp CLI
+        run: npm install -g @marp-team/marp-cli
+
+      - name: Determine target date
+        id: target
+        run: |
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            TARGET_DATE="${{ github.event.inputs.target_date }}"
+          else
+            # 最新の日付ディレクトリを取得
+            TARGET_DATE=$(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r | head -n1 | sed 's|./||')
+          fi
+          
+          echo "target_date=$TARGET_DATE" >> $GITHUB_OUTPUT
+          echo "🎯 Target date: $TARGET_DATE"
+          
+          # スライドファイルの存在確認
+          if [ -f "$TARGET_DATE/slide.md" ]; then
+            echo "slide_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Found slide.md in $TARGET_DATE"
+          else
+            echo "slide_exists=false" >> $GITHUB_OUTPUT
+            echo "❌ slide.md not found in $TARGET_DATE"
+          fi
+
+      - name: Check Slack configuration
+        id: config
+        run: |
+          echo "🔍 Checking Slack configuration..."
+          
+          if [ -n "${{ secrets.SLACK_BOT_TOKEN }}" ] && [ -n "${{ secrets.SLACK_REVIEW_CHANNEL }}" ]; then
+            echo "bot_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Bot Token configuration found"
+          else
+            echo "bot_available=false" >> $GITHUB_OUTPUT
+            echo "❌ Bot Token configuration missing"
+          fi
+          
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "webhook_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Webhook configuration found"
+          else
+            echo "webhook_available=false" >> $GITHUB_OUTPUT
+            echo "❌ Webhook configuration missing"
+          fi
+
+      - name: Generate test PDF
+        if: steps.target.outputs.slide_exists == 'true' && (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods')
+        run: |
+          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          
+          echo "📄 Generating test PDF for $TARGET_DATE..."
+          
+          # PDFディレクトリ作成
+          mkdir -p test-output
+          
+          # PDF生成（元のディレクトリで実行して相対パス維持）
+          cd "$TARGET_DATE"
+          marp "slide.md" \
+            --pdf \
+            --allow-local-files \
+            --output "../test-output/test-$TARGET_DATE.pdf"
+          cd ..
+          
+          # ファイルサイズチェック
+          PDF_SIZE=$(stat -c%s "test-output/test-$TARGET_DATE.pdf")
+          echo "📊 PDF size: $PDF_SIZE bytes"
+          
+          # Slack用の制限チェック（10MB = 10485760 bytes）
+          if [ $PDF_SIZE -gt 10485760 ]; then
+            echo "⚠️ PDF size exceeds Slack limit (10MB)"
+            echo "pdf_too_large=true" >> $GITHUB_ENV
+          else
+            echo "✅ PDF size OK for Slack"
+            echo "pdf_too_large=false" >> $GITHUB_ENV
+          fi
+
+      - name: Test Bot Token notification
+        if: (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.bot_available == 'true' && steps.target.outputs.slide_exists == 'true' && env.pdf_too_large == 'false'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
+        run: |
+          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          CURRENT_TIME=$(date '+%Y年%m月%d日 %H:%M JST')
+          TEST_MSG="${{ github.event.inputs.test_message }}"
+          
+          echo "🤖 Testing Bot Token notification..."
+          
+          # メッセージ内容を変数に格納
+          MESSAGE="$TEST_MSG - Bot Token テスト
+          $CURRENT_TIME 時点での資料はこちらです。レビューをお願いします。
+          
+          📋 レビューポイント:
+          • 内容の正確性
+          • 説明の分かりやすさ  
+          • 時間配分
+          • スライドデザイン
+          
+          💬 フィードバック方法: このスレッドにコメントをお願いします
+          
+          ⚠️ これはテスト通知です"
+          
+          # PDFをSlackにアップロード
+          UPLOAD_RESPONSE=$(curl -F file=@"test-output/test-$TARGET_DATE.pdf" \
+            -F channels="$SLACK_CHANNEL" \
+            -F title="🧪 テスト用スライド ($TARGET_DATE)" \
+            -F initial_comment="$MESSAGE" \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            https://slack.com/api/files.upload)
+          
+          echo "📤 Upload response: $UPLOAD_RESPONSE"
+          
+          # アップロード成功確認
+          if echo "$UPLOAD_RESPONSE" | grep -q '"ok":true'; then
+            echo "✅ Bot Token test successful!"
+          else
+            echo "❌ Bot Token test failed"
+            echo "$UPLOAD_RESPONSE"
+          fi
+
+      - name: Test Webhook notification
+        if: (github.event.inputs.notification_type == 'webhook_with_links' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.webhook_available == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          CURRENT_TIME=$(date '+%Y年%m月%d日 %H:%M JST')
+          TEST_MSG="${{ github.event.inputs.test_message }}"
+          
+          echo "🪝 Testing Webhook notification..."
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"blocks\": [
+                {
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"$TEST_MSG - Webhook テスト\\n\\n${CURRENT_TIME} 時点での資料はこちらです。レビューをお願いします。\"
+                  }
+                },
+                {
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"📋 レビューポイント:\\n• 内容の正確性\\n• 説明の分かりやすさ\\n• 時間配分\\n• スライドデザイン\"
+                  }
+                },
+                {
+                  \"type\": \"actions\",
+                  \"elements\": [
+                    {
+                      \"type\": \"button\",
+                      \"text\": { \"type\": \"plain_text\", \"text\": \"📄 PDFダウンロード\" },
+                      \"url\": \"${PAGES_URL}/slides/${TARGET_DATE}.pdf\",
+                      \"style\": \"primary\"
+                    },
+                    {
+                      \"type\": \"button\",
+                      \"text\": { \"type\": \"plain_text\", \"text\": \"📊 HTMLプレビュー\" },
+                      \"url\": \"${PAGES_URL}/slides/${TARGET_DATE}.html\"
+                    }
+                  ]
+                },
+                {
+                  \"type\": \"context\",
+                  \"elements\": [
+                    {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"⚠️ これはテスト通知です | 💬 このスレッドにフィードバックをお願いします\"
+                    }
+                  ]
+                }
+              ]
+            }" \
+            $SLACK_WEBHOOK_URL
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Webhook test successful!"
+          else
+            echo "❌ Webhook test failed"
+          fi
+
+      - name: Test no-slide notification
+        if: github.event.inputs.notification_type == 'no_slide_notification' || github.event.inputs.notification_type == 'test_all_methods'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          PAGES_URL="https://alt9800.github.io/2025-RemoteSensingSeminar"
+          TEST_MSG="${{ github.event.inputs.test_message }}"
+          
+          echo "📭 Testing no-slide notification..."
+          
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"blocks\": [
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"$TEST_MSG - スライドなし通知テスト\\n\\n⚠️ **レビュー通知**\\n\\nまだ出来上がってないみたいです、少々お待ちください...\"
+                    }
+                  },
+                  {
+                    \"type\": \"actions\",
+                    \"elements\": [
+                      {
+                        \"type\": \"button\",
+                        \"text\": { \"type\": \"plain_text\", \"text\": \"📋 資料サイトで確認\" },
+                        \"url\": \"${PAGES_URL}\",
+                        \"style\": \"primary\"
+                      }
+                    ]
+                  },
+                  {
+                    \"type\": \"context\",
+                    \"elements\": [
+                      {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"⚠️ これはテスト通知です | 📝 資料の準備ができ次第、改めてレビュー依頼をお送りします\"
+                      }
+                    ]
+                  }
+                ]
+              }" \
+              $SLACK_WEBHOOK_URL
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ No-slide notification test successful!"
+            else
+              echo "❌ No-slide notification test failed"
+            fi
+          else
+            echo "⚠️ Webhook URL not configured, skipping no-slide test"
+          fi
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## 🧪 Slack通知テスト結果" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**テスト実行日時:** $(date '+%Y年%m月%d日 %H:%M JST')" >> $GITHUB_STEP_SUMMARY
+          echo "**対象日付:** ${{ steps.target.outputs.target_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "**テストタイプ:** ${{ github.event.inputs.notification_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📊 設定状況" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.config.outputs.bot_available }}" = "true" ]; then
+            echo "- ✅ Bot Token設定済み" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Bot Token未設定" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.config.outputs.webhook_available }}" = "true" ]; then
+            echo "- ✅ Webhook設定済み" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Webhook未設定" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.target.outputs.slide_exists }}" = "true" ]; then
+            echo "- ✅ スライドファイル存在" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ スライドファイルなし" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 💡 次のステップ" >> $GITHUB_STEP_SUMMARY
+          echo "1. Slackでテスト通知を確認してください" >> $GITHUB_STEP_SUMMARY
+          echo "2. 問題があれば設定を見直してください" >> $GITHUB_STEP_SUMMARY
+          echo "3. 正常であれば本番用ワークフローを有効にしてください" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf test-output
