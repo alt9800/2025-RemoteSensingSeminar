@@ -193,14 +193,15 @@ jobs:
           
           echo "📤 Step 1: Getting upload URL..."
           
-          # Step 1: アップロードURLを取得 (JSON構文とContent-Typeを修正)
+          # デバッグ: 送信するJSONを表示
+          echo "Sending JSON payload:"
+          echo "{\"filename\": \"test-slide-$TARGET_DATE.pdf\", \"length\": $FILE_SIZE}"
+          
+          # Step 1: アップロードURLを取得
           UPLOAD_URL_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
             -H "Content-Type: application/json; charset=utf-8" \
-            -d "{
-              \"filename\": \"test-slide-$TARGET_DATE.pdf\",
-              \"length\": $FILE_SIZE
-            }" \
+            -d "{\"filename\": \"test-slide-$TARGET_DATE.pdf\", \"length\": $FILE_SIZE}" \
             https://slack.com/api/files.getUploadURLExternal)
           
           echo "getUploadURLExternal response: $UPLOAD_URL_RESPONSE"
@@ -295,20 +296,37 @@ jobs:
             
             echo "🔄 Fallback: Sending message with GitHub Pages link..."
             
-            # フォールバック: GitHub Pagesリンクを送信
-            FALLBACK_MESSAGE="$MESSAGE
-
-            📎 PDFファイルは以下のリンクから確認してください：
-            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/slides/$TARGET_DATE.pdf"
+            # シンプルなテストメッセージでまず試す
+            SIMPLE_MESSAGE="テストメッセージ - $TARGET_DATE"
             
-            # JSONエスケープとContent-Typeを修正
-            ESCAPED_MESSAGE=$(echo "$FALLBACK_MESSAGE" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' '\\n')
+            echo "Testing simple message first:"
+            echo "JSON: {\"channel\": \"$SLACK_CHANNEL\", \"text\": \"$SIMPLE_MESSAGE\"}"
             
-            FALLBACK_RESPONSE=$(curl -s -X POST \
+            SIMPLE_RESPONSE=$(curl -s -X POST \
               -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
               -H "Content-Type: application/json; charset=utf-8" \
-              -d "{\"channel\": \"$SLACK_CHANNEL\", \"text\": \"$ESCAPED_MESSAGE\"}" \
+              -d "{\"channel\": \"$SLACK_CHANNEL\", \"text\": \"$SIMPLE_MESSAGE\"}" \
               https://slack.com/api/chat.postMessage)
+            
+            echo "Simple message response: $SIMPLE_RESPONSE"
+            
+            if echo "$SIMPLE_RESPONSE" | grep -q '"ok":true'; then
+              echo "✅ Simple message worked, trying full message..."
+              
+              # フルメッセージを送信
+              GITHUB_LINK="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/slides/$TARGET_DATE.pdf"
+              FULL_MESSAGE="$TARGET_DATE のテスト完了。PDFリンク: $GITHUB_LINK"
+              
+              FALLBACK_RESPONSE=$(curl -s -X POST \
+                -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+                -H "Content-Type: application/json; charset=utf-8" \
+                -d "{\"channel\": \"$SLACK_CHANNEL\", \"text\": \"$FULL_MESSAGE\"}" \
+                https://slack.com/api/chat.postMessage)
+              
+              echo "Full message response: $FALLBACK_RESPONSE"
+            else
+              echo "❌ Even simple message failed"
+            fi
             
             echo "Fallback response: $FALLBACK_RESPONSE"
             
