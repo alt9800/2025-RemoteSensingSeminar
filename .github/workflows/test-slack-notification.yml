@@ -193,10 +193,10 @@ jobs:
           
           echo "📤 Step 1: Getting upload URL..."
           
-          # Step 1: アップロードURLを取得
+          # Step 1: アップロードURLを取得 (JSON構文とContent-Typeを修正)
           UPLOAD_URL_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json; charset=utf-8" \
             -d "{
               \"filename\": \"test-slide-$TARGET_DATE.pdf\",
               \"length\": $FILE_SIZE
@@ -301,13 +301,13 @@ jobs:
             📎 PDFファイルは以下のリンクから確認してください：
             https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/slides/$TARGET_DATE.pdf"
             
+            # JSONエスケープとContent-Typeを修正
+            ESCAPED_MESSAGE=$(echo "$FALLBACK_MESSAGE" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' '\\n')
+            
             FALLBACK_RESPONSE=$(curl -s -X POST \
               -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"channel\": \"$SLACK_CHANNEL\",
-                \"text\": \"$(echo "$FALLBACK_MESSAGE" | sed 's/"/\\"/g' | tr '\n' '\\n')\"
-              }" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              -d "{\"channel\": \"$SLACK_CHANNEL\", \"text\": \"$ESCAPED_MESSAGE\"}" \
               https://slack.com/api/chat.postMessage)
             
             echo "Fallback response: $FALLBACK_RESPONSE"
