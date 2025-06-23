@@ -211,10 +211,10 @@ jobs:
           # レスポンスからJSONだけ抽出
           JSON_RESPONSE=$(echo "$UPLOAD_URL_RESPONSE" | grep -E '^{.*}
           
-          if echo "$JSON_RESPONSE" | grep -q '"ok":true'; then
+          if echo "$UPLOAD_URL_RESPONSE" | grep -q '"ok":true'; then
             # アップロードURLとファイルIDを抽出
-            UPLOAD_URL=$(echo "$JSON_RESPONSE" | grep -o '"upload_url":"[^"]*"' | cut -d'"' -f4)
-            FILE_ID=$(echo "$JSON_RESPONSE" | grep -o '"file_id":"[^"]*"' | cut -d'"' -f4)
+            UPLOAD_URL=$(echo "$UPLOAD_URL_RESPONSE" | grep -o '"upload_url":"[^"]*"' | cut -d'"' -f4)
+            FILE_ID=$(echo "$UPLOAD_URL_RESPONSE" | grep -o '"file_id":"[^"]*"' | cut -d'"' -f4)
             
             echo "✅ Upload URL obtained"
             echo "   Upload URL: $UPLOAD_URL"
@@ -294,7 +294,7 @@ jobs:
             echo "❌ Failed to get upload URL"
             
             # エラー詳細
-            ERROR_MSG=$(echo "$JSON_RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+            ERROR_MSG=$(echo "$UPLOAD_URL_RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
             if [ -n "$ERROR_MSG" ]; then
               echo "   Error: $ERROR_MSG"
             fi
@@ -499,7 +499,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -rf test-output | tail -1
+          rm -rf test-output | tail -1)
           echo "JSON response only: $JSON_RESPONSE"
           
           if echo "$UPLOAD_URL_RESPONSE" | grep -q '"ok":true'; then
