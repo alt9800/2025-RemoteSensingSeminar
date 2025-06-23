@@ -499,7 +499,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -rf test-output | tail -1)
+          rm -rf test-output | tail -1
           echo "JSON response only: $JSON_RESPONSE"
           
           if echo "$UPLOAD_URL_RESPONSE" | grep -q '"ok":true'; then
