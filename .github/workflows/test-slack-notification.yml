@@ -165,7 +165,7 @@ jobs:
           CURRENT_TIME=$(date '+%Y年%m月%d日 %H:%M JST')
           TEST_MSG="${{ github.event.inputs.test_message }}"
           
-          echo "🤖 Testing Bot Token notification with files.upload_v2..."
+          echo "🤖 Testing Bot Token notification with files.uploadV2..."
           echo "   Target date: $TARGET_DATE"
           echo "   Channel: $SLACK_CHANNEL"
           echo "   PDF too large: ${{ env.pdf_too_large }}"
@@ -177,42 +177,90 @@ jobs:
           fi
           
           MESSAGE="$TEST_MSG - Bot Token テスト
-                  
-          $CURRENT_TIME 時点での資料はこちらです。レビューをお願いします。
-                  
-          📋 レビューポイント:
-          • 内容の正確性
-          • 説明の分かりやすさ  
-          • 時間配分
-          • スライドデザイン
+
+$CURRENT_TIME 時点での資料はこちらです。レビューをお願いします。
+
+📋 レビューポイント:
+• 内容の正確性
+• 説明の分かりやすさ  
+• 時間配分
+• スライドデザイン
+
+💬 フィードバック方法: このスレッドにコメントをお願いします
+
+⚠️ これはテスト通知です"
           
-          💬 フィードバック方法: このスレッドにコメントをお願いします
+          echo "📤 Uploading PDF to Slack with files.uploadV2..."
           
-          ⚠️ これはテスト通知です"
-          
-          echo "📤 Uploading PDF to Slack..."
-          
-          # ファイルを直接チャンネルにアップロード
-          UPLOAD_RESPONSE=$(curl -v -F file=@"test-output/test-$TARGET_DATE.pdf" \
+          # 正しいSlack API v2 エンドポイントを使用
+          UPLOAD_RESPONSE=$(curl -v \
+            -F file=@"test-output/test-$TARGET_DATE.pdf" \
             -F filename="test-slide-$TARGET_DATE.pdf" \
-            -F channel="$SLACK_CHANNEL" \
+            -F channels="$SLACK_CHANNEL" \
             -F initial_comment="$MESSAGE" \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            https://slack.com/api/files.upload_v2 2>&1)
+            https://slack.com/api/files.uploadV2 2>&1)
           
           echo "📋 Full upload response:"
           echo "$UPLOAD_RESPONSE"
           
-          # アップロード成功確認
-          if echo "$UPLOAD_RESPONSE" | grep -q '"ok":true'; then
-            echo "✅ Bot Token test successful!"
-          else
-            echo "❌ Bot Token test failed"
+          # 404エラーの場合は従来のAPIにフォールバック
+          if echo "$UPLOAD_RESPONSE" | grep -q "404\|method_deprecated"; then
+            echo "🔄 Trying alternative approach: chat.postMessage + file share..."
             
-            # エラー詳細を抽出
-            ERROR_MSG=$(echo "$UPLOAD_RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
-            if [ -n "$ERROR_MSG" ]; then
-              echo "   Error: $ERROR_MSG"
+            # Step 1: ファイルをアップロード（チャンネル指定なし）
+            UPLOAD_RESPONSE=$(curl -v \
+              -F file=@"test-output/test-$TARGET_DATE.pdf" \
+              -F filename="test-slide-$TARGET_DATE.pdf" \
+              -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+              https://slack.com/api/files.upload 2>&1)
+            
+            echo "File upload response: $UPLOAD_RESPONSE"
+            
+            # ファイルURLを抽出
+            FILE_URL=$(echo "$UPLOAD_RESPONSE" | grep -o '"url_private":"[^"]*"' | cut -d'"' -f4)
+            
+            if [ -n "$FILE_URL" ]; then
+              echo "✅ File uploaded, sending message..."
+              
+              # Step 2: メッセージを送信
+              MESSAGE_RESPONSE=$(curl -X POST \
+                -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"channel\": \"$SLACK_CHANNEL\",
+                  \"text\": \"$(echo "$MESSAGE" | sed 's/"/\\"/g' | tr '\n' '\\n')\",
+                  \"attachments\": [{
+                    \"fallback\": \"PDFファイル: test-slide-$TARGET_DATE.pdf\",
+                    \"title\": \"📎 PDFファイル\",
+                    \"title_link\": \"$FILE_URL\",
+                    \"color\": \"good\"
+                  }]
+                }" \
+                https://slack.com/api/chat.postMessage)
+              
+              echo "Message response: $MESSAGE_RESPONSE"
+              
+              if echo "$MESSAGE_RESPONSE" | grep -q '"ok":true'; then
+                echo "✅ Bot Token test successful!"
+              else
+                echo "❌ Message sending failed"
+              fi
+            else
+              echo "❌ File upload failed"
+            fi
+          else
+            # 正常なレスポンスの場合
+            if echo "$UPLOAD_RESPONSE" | grep -q '"ok":true'; then
+              echo "✅ Bot Token test successful!"
+            else
+              echo "❌ Bot Token test failed"
+              
+              # エラー詳細を抽出
+              ERROR_MSG=$(echo "$UPLOAD_RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+              if [ -n "$ERROR_MSG" ]; then
+                echo "   Error: $ERROR_MSG"
+              fi
             fi
           fi
 
