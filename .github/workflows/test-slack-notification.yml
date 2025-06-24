@@ -1,4 +1,4 @@
-name: Test Slack Notification
+name: Test Slack Notification (3.0.0)
 on:
   workflow_dispatch:
     inputs:
