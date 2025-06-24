@@ -1,64 +1,34 @@
-name: Test Slack Notification
+name: Slack PDF Notification
 on:
   workflow_dispatch:
     inputs:
       target_date:
-        description: 'テスト対象の日付 (YYYY-MM-DD) - 空欄で最新 ****'
+        description: '対象日付 (YYYY-MM-DD) - 空欄で最新'
         required: false
         type: string
-      notification_type:
-        description: 'テストする通知タイプ'
-        required: true
-        type: choice
-        options:
-          - 'bot_with_pdf'
-          - 'webhook_with_links'
-          - 'no_slide_notification'
-          - 'test_all_methods'
-        default: 'test_all_methods'
-      test_message:
-        description: 'テスト識別用メッセージ'
+      test_mode:
+        description: 'テストモード'
         required: false
-        type: string
-        default: '🧪 Slack通知テスト'
+        type: boolean
+        default: false
+
+run-name: |
+  Slack PDF通知 ${{ inputs.target_date || '(最新)' }} ${{ inputs.test_mode && '[TEST]' || '' }}
 
 jobs:
-  test-notification:
+  notify-slack:
     runs-on: ubuntu-latest
     steps:
-      - name: Show workflow version
-        run: |
-          echo "📌 Workflow Version: 3.0.0"
-          echo "📅 Updated: 2025-01-25"
-          echo "🔧 Fix: Form data形式でのAPI呼び出しに変更（JSONではなくForm data）"
-          echo ""
-          echo "## 📌 Workflow Version 3.0.0" >> $GITHUB_STEP_SUMMARY
-          echo "Updated: 2025-01-25 - Form data形式でのAPI呼び出しに変更" >> $GITHUB_STEP_SUMMARY
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Japanese fonts
+      - name: Setup environment
+        id: setup
         run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
-          fc-cache -fv
-
-      - name: Install Marp CLI
-        run: npm install -g @marp-team/marp-cli
-
-      - name: Install jq for JSON processing
-        run: |
-          sudo apt-get install -y jq
-
-      - name: Determine target date
-        id: target
-        run: |
+          echo "🚀 Slack PDF Notification v4.0"
+          echo "📅 Form data方式でPDFアップロード"
+          
+          # 対象日付の決定
           if [ -n "${{ github.event.inputs.target_date }}" ]; then
             TARGET_DATE="${{ github.event.inputs.target_date }}"
           else
@@ -66,347 +36,214 @@ jobs:
           fi
           
           echo "target_date=$TARGET_DATE" >> $GITHUB_OUTPUT
-          echo "🎯 Target date: $TARGET_DATE"
+          echo "📁 Target: $TARGET_DATE"
           
+          # ファイル存在確認
           if [ -f "$TARGET_DATE/slide.md" ]; then
             echo "slide_exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found slide.md in $TARGET_DATE"
+            echo "✅ slide.md found"
           else
             echo "slide_exists=false" >> $GITHUB_OUTPUT
-            echo "❌ slide.md not found in $TARGET_DATE"
+            echo "❌ slide.md not found"
           fi
 
-      - name: Check Slack configuration
-        id: config
+      - name: Install dependencies
+        if: steps.setup.outputs.slide_exists == 'true'
         run: |
-          echo "🔍 Checking Slack configuration..."
-          
-          if [ -n "${{ secrets.SLACK_BOT_TOKEN }}" ] && [ -n "${{ secrets.SLACK_REVIEW_CHANNEL }}" ]; then
-            echo "bot_available=true" >> $GITHUB_OUTPUT
-            echo "✅ Bot Token configuration found"
-          else
-            echo "bot_available=false" >> $GITHUB_OUTPUT
-            echo "❌ Bot Token configuration missing"
-          fi
-          
-          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
-            echo "webhook_available=true" >> $GITHUB_OUTPUT
-            echo "✅ Webhook configuration found"
-          else
-            echo "webhook_available=false" >> $GITHUB_OUTPUT
-            echo "❌ Webhook configuration missing"
-          fi
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra jq
+          npm install -g @marp-team/marp-cli
 
-      - name: Generate test PDF
-        if: steps.target.outputs.slide_exists == 'true' && (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods')
+      - name: Generate PDF
+        if: steps.setup.outputs.slide_exists == 'true'
+        id: generate
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
           
-          echo "📄 Generating test PDF for $TARGET_DATE..."
-          
-          mkdir -p test-output
+          echo "📄 Generating PDF..."
+          mkdir -p output
           
           cd "$TARGET_DATE"
-          marp "slide.md" \
+          marp slide.md \
             --pdf \
             --allow-local-files \
-            --output "../test-output/test-$TARGET_DATE.pdf"
+            --output "../output/slide-$TARGET_DATE.pdf"
           cd ..
           
-          PDF_SIZE=$(stat -c%s "test-output/test-$TARGET_DATE.pdf")
-          echo "📊 PDF size: $PDF_SIZE bytes"
-          
-          if [ $PDF_SIZE -gt 10485760 ]; then
-            echo "⚠️ PDF size exceeds Slack limit (10MB)"
-            echo "テスト用に小さなPDFを生成します..."
-            
-            cd "$TARGET_DATE"
-            head -50 slide.md > slide_short.md
-            marp "slide_short.md" \
-              --pdf \
-              --allow-local-files \
-              --output "../test-output/test-$TARGET_DATE.pdf"
-            rm slide_short.md
-            cd ..
-            
-            NEW_SIZE=$(stat -c%s "test-output/test-$TARGET_DATE.pdf")
-            echo "📊 Shortened PDF size: $NEW_SIZE bytes"
-          fi
+          PDF_SIZE=$(stat -c%s "output/slide-$TARGET_DATE.pdf")
+          echo "pdf_size=$PDF_SIZE" >> $GITHUB_OUTPUT
+          echo "✅ PDF generated: $PDF_SIZE bytes"
 
-      - name: Test Bot Token notification with PDF upload
-        if: (github.event.inputs.notification_type == 'bot_with_pdf' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.bot_available == 'true' && steps.target.outputs.slide_exists == 'true'
+      - name: Upload PDF to Slack
+        if: steps.setup.outputs.slide_exists == 'true' && env.SLACK_BOT_TOKEN != ''
+        id: upload
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
-          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
-          TEST_MSG="${{ github.event.inputs.test_message }}"
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
+          PDF_SIZE="${{ steps.generate.outputs.pdf_size }}"
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M')
+          TEST_MODE="${{ github.event.inputs.test_mode }}"
           
-          echo "🤖 Testing Bot Token notification with PDF upload..."
-          echo "   Version: 2.0.0"
-          echo "   Target date: $TARGET_DATE"
-          echo "   Channel: $SLACK_CHANNEL"
-          
-          if [ ! -f "test-output/test-$TARGET_DATE.pdf" ]; then
-            echo "❌ PDF file not found: test-output/test-$TARGET_DATE.pdf"
-            exit 1
+          # メッセージ作成
+          if [ "$TEST_MODE" = "true" ]; then
+            MESSAGE="🧪 テスト通知 - $CURRENT_TIME\nPDF: $TARGET_DATE"
+          else
+            MESSAGE="📊 週次レビュー資料が準備できました\n\n日付: $TARGET_DATE\n生成時刻: $CURRENT_TIME\n\n📋 レビューポイント:\n• 内容の正確性\n• 説明の分かりやすさ\n• 時間配分\n• スライドデザイン\n\n💬 フィードバックはスレッドにお願いします"
           fi
           
-          FILE_SIZE=$(stat -c%s "test-output/test-$TARGET_DATE.pdf")
-          echo "📊 File size: $FILE_SIZE bytes"
+          echo "🔄 Starting upload process..."
           
-          # シンプルなメッセージテキスト
-          MESSAGE_TEXT="$TEST_MSG v2.0.0 - $CURRENT_TIME
-          PDF: $TARGET_DATE
-          ⚠️ これはテスト通知です"
-          
-          # Method 1: 推奨される方法 - jqを使用してJSONを生成
-          echo "📤 Attempting PDF file upload with direct channel sharing..."
-          
-          # Step 1: アップロードURLを取得（jqを使用）
-          echo "Step 1: Getting upload URL (using jq)..."
-          
-          # JSONデータを作成
-          UPLOAD_JSON=$(jq -n \
-            --arg filename "test-slide-$TARGET_DATE.pdf" \
-            --arg length "$FILE_SIZE" \
-            --arg alt_txt "$TARGET_DATE のスライド" \
-            '{filename: $filename, length: ($length | tonumber), alt_txt: $alt_txt}')
-          
-          echo "Upload JSON: $UPLOAD_JSON"
-          
-          UPLOAD_URL_RESPONSE=$(curl -s -X POST \
+          # Step 1: アップロードURL取得（Form data形式）
+          echo "Getting upload URL..."
+          UPLOAD_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$UPLOAD_JSON" \
+            -F "filename=slide-$TARGET_DATE.pdf" \
+            -F "length=$PDF_SIZE" \
             https://slack.com/api/files.getUploadURLExternal)
           
-          echo "Upload URL response: $UPLOAD_URL_RESPONSE"
-          
-          # レスポンスを確認
-          if echo "$UPLOAD_URL_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
-            # JSONから値を安全に抽出
-            UPLOAD_URL=$(echo "$UPLOAD_URL_RESPONSE" | jq -r '.upload_url')
-            FILE_ID=$(echo "$UPLOAD_URL_RESPONSE" | jq -r '.file_id')
+          if echo "$UPLOAD_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
+            UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload_url')
+            FILE_ID=$(echo "$UPLOAD_RESPONSE" | jq -r '.file_id')
+            echo "✅ Got upload URL"
             
-            echo "✅ Upload URL obtained"
-            echo "   File ID: $FILE_ID"
-            echo "   Upload URL: ${UPLOAD_URL:0:50}..."
-            
-            # Step 2: ファイルをアップロード
-            echo "Step 2: Uploading file..."
-            UPLOAD_STATUS=$(curl -s -w "%{http_code}" -X POST \
-              -F "file=@test-output/test-$TARGET_DATE.pdf" \
+            # Step 2: ファイルアップロード
+            echo "Uploading file..."
+            HTTP_STATUS=$(curl -s -w "%{http_code}" -X POST \
+              -F "file=@output/slide-$TARGET_DATE.pdf" \
               "$UPLOAD_URL" \
               -o /dev/null)
             
-            if [ "$UPLOAD_STATUS" = "200" ] || [ "$UPLOAD_STATUS" = "201" ] || [ "$UPLOAD_STATUS" = "204" ]; then
-              echo "✅ File uploaded successfully (HTTP $UPLOAD_STATUS)"
+            if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "201" ] || [ "$HTTP_STATUS" = "204" ]; then
+              echo "✅ File uploaded"
               
-              # Step 3: アップロード完了とチャンネル共有を同時に実行
-              echo "Step 3: Completing upload and sharing to channel..."
+              # Step 3: アップロード完了とチャンネル共有
+              echo "Completing upload..."
+              
+              # メッセージ内の改行をエスケープ
+              ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed ':a;N;$!ba;s/\n/\\n/g')
               
               COMPLETE_RESPONSE=$(curl -s -X POST \
                 -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                 -H "Content-Type: application/json; charset=utf-8" \
-                --data-raw "{\"files\":[{\"id\":\"$FILE_ID\",\"title\":\"Test PDF v2.1.0\"}],\"channel_id\":\"$SLACK_CHANNEL\",\"initial_comment\":\"$MESSAGE_TEXT\"}" \
+                --data-raw "{
+                  \"files\": [{
+                    \"id\": \"$FILE_ID\",
+                    \"title\": \"週次レビュー資料 - $TARGET_DATE\"
+                  }],
+                  \"channel_id\": \"$SLACK_CHANNEL\",
+                  \"initial_comment\": \"$ESCAPED_MESSAGE\"
+                }" \
                 https://slack.com/api/files.completeUploadExternal)
               
-              echo "Complete upload response: $COMPLETE_RESPONSE"
-              
               if echo "$COMPLETE_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
-                echo "🎉 PDF upload and sharing successful!"
-                echo "✅ File has been uploaded and shared to the channel"
+                echo "🎉 SUCCESS! PDF uploaded and shared"
+                echo "upload_success=true" >> $GITHUB_OUTPUT
               else
-                ERROR_MSG=$(echo "$COMPLETE_RESPONSE" | jq -r '.error // "unknown"')
-                echo "❌ Failed to complete upload: $ERROR_MSG"
-                
-                # Method 2: 代替方法 - completeUploadExternalもForm dataで試す
-                echo "🔄 Trying alternative method..."
-                
-                # アップロードのみ完了（Form data形式）
-                COMPLETE_ONLY_RESPONSE=$(curl -s -X POST \
-                  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-                  -F "files=[{\"id\":\"$FILE_ID\",\"title\":\"テスト用スライド ($TARGET_DATE)\"}]" \
-                  https://slack.com/api/files.completeUploadExternal)
-                
-                echo "Complete only response: $COMPLETE_ONLY_RESPONSE"
-                
-                if echo "$COMPLETE_ONLY_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
-                  echo "✅ Upload completed, now sharing..."
-                  
-                  # chat.postMessageでファイルを共有
-                  SHARE_JSON=$(jq -n \
-                    --arg channel "$SLACK_CHANNEL" \
-                    --arg text "$MESSAGE_TEXT" \
-                    --arg files "$FILE_ID" \
-                    '{
-                      channel: $channel,
-                      text: $text,
-                      files: $files
-                    }')
-                  
-                  SHARE_RESPONSE=$(curl -s -X POST \
-                    -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-                    -H "Content-Type: application/json" \
-                    -d "$SHARE_JSON" \
-                    https://slack.com/api/chat.postMessage)
-                  
-                  echo "Share response: $SHARE_RESPONSE"
-                  
-                  if echo "$SHARE_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
-                    echo "🎉 Alternative method successful!"
-                  else
-                    ERROR_MSG=$(echo "$SHARE_RESPONSE" | jq -r '.error // "unknown"')
-                    echo "❌ Alternative method also failed: $ERROR_MSG"
-                  fi
-                fi
+                echo "❌ Complete upload failed"
+                echo "Error: $(echo "$COMPLETE_RESPONSE" | jq -r '.error')"
+                echo "upload_success=false" >> $GITHUB_OUTPUT
               fi
             else
-              echo "❌ File upload failed (HTTP $UPLOAD_STATUS)"
+              echo "❌ File upload failed (HTTP $HTTP_STATUS)"
+              echo "upload_success=false" >> $GITHUB_OUTPUT
             fi
           else
-          # 最終デバッグ情報
-          if ! echo "$UPLOAD_URL_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
-            echo ""
-            echo "❌ All methods failed to get upload URL"
-            echo ""
-            echo "Debug: Testing basic API connection..."
-            # APIの基本的な接続テスト
-            AUTH_TEST=$(curl -s -X POST \
-              -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-              -H "Content-Type: application/json; charset=utf-8" \
-              https://slack.com/api/auth.test)
-            
-            echo "Auth test response: $AUTH_TEST"
-            
-            if echo "$AUTH_TEST" | jq -e '.ok == true' > /dev/null 2>&1; then
-              echo "✅ Bot token is valid"
-              echo "User ID: $(echo "$AUTH_TEST" | jq -r '.user_id')"
-              echo "Team: $(echo "$AUTH_TEST" | jq -r '.team')"
-            else
-              echo "❌ Bot token may be invalid"
-            fi
-          fi
-          fi
-          
-          # Method 3: フォールバック - リンク送信
-          echo ""
-          echo "🔄 Fallback: Sending message with GitHub Pages link..."
-          
-          GITHUB_LINK="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/slides/$TARGET_DATE.pdf"
-          FALLBACK_MESSAGE="$TEST_MSG v2.0.0 - $CURRENT_TIME
-          📎 PDF: $GITHUB_LINK
-          ⚠️ テスト通知（フォールバック）"
-          
-          FALLBACK_JSON=$(jq -n \
-            --arg channel "$SLACK_CHANNEL" \
-            --arg text "$FALLBACK_MESSAGE" \
-            '{channel: $channel, text: $text}')
-          
-          FALLBACK_RESPONSE=$(curl -s -X POST \
-            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$FALLBACK_JSON" \
-            https://slack.com/api/chat.postMessage)
-          
-          echo "Fallback response: $FALLBACK_RESPONSE"
-          
-          if echo "$FALLBACK_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
-            echo "✅ Fallback message sent successfully"
-          else
-            ERROR_MSG=$(echo "$FALLBACK_RESPONSE" | jq -r '.error // "unknown"')
-            echo "❌ Fallback also failed: $ERROR_MSG"
+            echo "❌ Failed to get upload URL"
+            echo "Error: $(echo "$UPLOAD_RESPONSE" | jq -r '.error')"
+            echo "upload_success=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Test Webhook notification
-        if: (github.event.inputs.notification_type == 'webhook_with_links' || github.event.inputs.notification_type == 'test_all_methods') && steps.config.outputs.webhook_available == 'true'
+      - name: Send fallback notification
+        if: |
+          (steps.setup.outputs.slide_exists == 'false' || steps.upload.outputs.upload_success == 'false') 
+          && env.SLACK_BOT_TOKEN != ''
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M')
           PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
-          TEST_MSG="${{ github.event.inputs.test_message }}"
           
-          echo "🪝 Testing Webhook notification (v2.0.0)..."
-          
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{
-              \"text\": \"$TEST_MSG v2.0.0 - Webhook\\n$CURRENT_TIME\\n<${PAGES_URL}/slides/${TARGET_DATE}.pdf|📄 PDF> | <${PAGES_URL}/slides/${TARGET_DATE}.html|📊 HTML>\"
-            }" \
-            $SLACK_WEBHOOK_URL
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ Webhook test successful!"
+          if [ "${{ steps.setup.outputs.slide_exists }}" = "false" ]; then
+            MESSAGE="⚠️ スライドがまだ準備できていません\n\n日付: $TARGET_DATE\n確認時刻: $CURRENT_TIME\n\n準備ができ次第、改めてお知らせします。"
           else
-            echo "❌ Webhook test failed"
+            MESSAGE="📎 PDFアップロードに失敗したため、リンクを共有します\n\n日付: $TARGET_DATE\n生成時刻: $CURRENT_TIME\n\nPDF: $PAGES_URL/slides/$TARGET_DATE.pdf\nHTML: $PAGES_URL/slides/$TARGET_DATE.html"
           fi
+          
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed ':a;N;$!ba;s/\n/\\n/g')
+          
+          curl -s -X POST \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            --data-raw "{
+              \"channel\": \"$SLACK_CHANNEL\",
+              \"text\": \"$ESCAPED_MESSAGE\"
+            }" \
+            https://slack.com/api/chat.postMessage
 
-      - name: Test no-slide notification
-        if: github.event.inputs.notification_type == 'no_slide_notification' || github.event.inputs.notification_type == 'test_all_methods'
+      - name: Send webhook notification
+        if: env.SLACK_WEBHOOK_URL != ''
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
-          PAGES_URL="https://alt9800.github.io/2025-RemoteSensingSeminar"
-          TEST_MSG="${{ github.event.inputs.test_message }}"
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
+          PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M')
           
-          echo "📭 Testing no-slide notification (v2.0.0)..."
-          
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          if [ "${{ steps.setup.outputs.slide_exists }}" = "true" ]; then
             curl -X POST -H 'Content-type: application/json' \
               --data "{
-                \"text\": \"$TEST_MSG v2.0.0 - スライドなし\\n⚠️ まだ準備中です\\n<${PAGES_URL}|📋 資料サイト>\"
+                \"blocks\": [
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"📊 週次レビュー資料の準備ができました\\n\\n日付: $TARGET_DATE\\n生成時刻: $CURRENT_TIME\"
+                    }
+                  },
+                  {
+                    \"type\": \"actions\",
+                    \"elements\": [
+                      {
+                        \"type\": \"button\",
+                        \"text\": { \"type\": \"plain_text\", \"text\": \"📄 PDF\" },
+                        \"url\": \"$PAGES_URL/slides/$TARGET_DATE.pdf\",
+                        \"style\": \"primary\"
+                      },
+                      {
+                        \"type\": \"button\",
+                        \"text\": { \"type\": \"plain_text\", \"text\": \"📊 HTML\" },
+                        \"url\": \"$PAGES_URL/slides/$TARGET_DATE.html\"
+                      }
+                    ]
+                  }
+                ]
               }" \
               $SLACK_WEBHOOK_URL
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 📊 実行結果サマリー" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**バージョン:** v4.0 (Form data方式)" >> $GITHUB_STEP_SUMMARY
+          echo "**実行時刻:** $(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M')" >> $GITHUB_STEP_SUMMARY
+          echo "**対象日付:** ${{ steps.setup.outputs.target_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.setup.outputs.slide_exists }}" = "true" ]; then
+            echo "✅ スライド: 存在" >> $GITHUB_STEP_SUMMARY
+            echo "📄 PDFサイズ: ${{ steps.generate.outputs.pdf_size }} bytes" >> $GITHUB_STEP_SUMMARY
             
-            if [ $? -eq 0 ]; then
-              echo "✅ No-slide notification test successful!"
+            if [ "${{ steps.upload.outputs.upload_success }}" = "true" ]; then
+              echo "✅ Slackアップロード: 成功" >> $GITHUB_STEP_SUMMARY
             else
-              echo "❌ No-slide notification test failed"
+              echo "❌ Slackアップロード: 失敗（フォールバック送信）" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "⚠️ Webhook URL not configured, skipping no-slide test"
+            echo "❌ スライド: 未作成" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Test summary
-        if: always()
-        run: |
-          echo "## 🧪 Slack通知テスト結果 (v2.0.0)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**テスト実行日時:** $(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M JST')" >> $GITHUB_STEP_SUMMARY
-          echo "**対象日付:** ${{ steps.target.outputs.target_date }}" >> $GITHUB_STEP_SUMMARY
-          echo "**テストタイプ:** ${{ github.event.inputs.notification_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "### 📊 設定状況" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.config.outputs.bot_available }}" = "true" ]; then
-            echo "- ✅ Bot Token設定済み" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ Bot Token未設定" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ "${{ steps.config.outputs.webhook_available }}" = "true" ]; then
-            echo "- ✅ Webhook設定済み" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ Webhook未設定" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ "${{ steps.target.outputs.slide_exists }}" = "true" ]; then
-            echo "- ✅ スライドファイル存在" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ スライドファイルなし" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 💡 次のステップ" >> $GITHUB_STEP_SUMMARY
-          echo "1. Slackでテスト通知を確認してください" >> $GITHUB_STEP_SUMMARY
-          echo "2. 問題があれば設定を見直してください" >> $GITHUB_STEP_SUMMARY
-          echo "3. 正常であれば本番用ワークフローを有効にしてください" >> $GITHUB_STEP_SUMMARY
-
-      - name: Cleanup
-        if: always()
-        run: |
-          rm -rf test-output
