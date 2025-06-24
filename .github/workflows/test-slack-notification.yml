@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       target_date:
-        description: 'テスト対象の日付 (YYYY-MM-DD) - 空欄で最新'
+        description: 'テスト対象の日付 (YYYY-MM-DD) - 空欄で最新 ****'
         required: false
         type: string
       notification_type:
