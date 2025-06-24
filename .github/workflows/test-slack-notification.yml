@@ -163,11 +163,7 @@ jobs:
           UPLOAD_URL_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"filename\": \"test-slide-$TARGET_DATE.pdf\",
-              \"length\": $FILE_SIZE,
-              \"alt_txt\": \"$TARGET_DATE のスライド\"
-            }" \
+            --data-raw "{\"filename\":\"test-slide-$TARGET_DATE.pdf\",\"length\":$FILE_SIZE,\"alt_txt\":\"$TARGET_DATE のスライド\"}" \
             https://slack.com/api/files.getUploadURLExternal)
           
           echo "Upload URL response: $UPLOAD_URL_RESPONSE"
@@ -194,23 +190,13 @@ jobs:
               # Step 3: アップロード完了とチャンネル共有を同時に実行
               echo "Step 3: Completing upload and sharing to channel..."
               
-              # JSONを適切にエスケープ
-              COMPLETE_JSON=$(cat <<EOF
-          {
-            "files": [{
-              "id": "$FILE_ID",
-              "title": "テスト用スライド ($TARGET_DATE)"
-            }],
-            "channel_id": "$SLACK_CHANNEL",
-            "initial_comment": "$MESSAGE_TEXT"
-          }
-          EOF
-          )
+              # メッセージテキストをエスケープ
+              ESCAPED_MESSAGE=$(echo "$MESSAGE_TEXT" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
               
               COMPLETE_RESPONSE=$(curl -s -X POST \
                 -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                 -H "Content-Type: application/json" \
-                -d "$COMPLETE_JSON" \
+                --data-raw "{\"files\":[{\"id\":\"$FILE_ID\",\"title\":\"テスト用スライド ($TARGET_DATE)\"}],\"channel_id\":\"$SLACK_CHANNEL\",\"initial_comment\":\"$ESCAPED_MESSAGE\"}" \
                 https://slack.com/api/files.completeUploadExternal)
               
               echo "Complete upload response: $COMPLETE_RESPONSE"
@@ -229,12 +215,7 @@ jobs:
                 COMPLETE_ONLY_RESPONSE=$(curl -s -X POST \
                   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                   -H "Content-Type: application/json" \
-                  -d "{
-                    \"files\": [{
-                      \"id\": \"$FILE_ID\",
-                      \"title\": \"テスト用スライド ($TARGET_DATE)\"
-                    }]
-                  }" \
+                  --data-raw "{\"files\":[{\"id\":\"$FILE_ID\",\"title\":\"テスト用スライド ($TARGET_DATE)\"}]}" \
                   https://slack.com/api/files.completeUploadExternal)
                 
                 if echo "$COMPLETE_ONLY_RESPONSE" | grep -q '"ok":true'; then
@@ -244,11 +225,7 @@ jobs:
                   SHARE_RESPONSE=$(curl -s -X POST \
                     -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                     -H "Content-Type: application/json" \
-                    -d "{
-                      \"channel\": \"$SLACK_CHANNEL\",
-                      \"text\": \"$MESSAGE_TEXT\",
-                      \"files\": \"$FILE_ID\"
-                    }" \
+                    --data-raw "{\"channel\":\"$SLACK_CHANNEL\",\"text\":\"$ESCAPED_MESSAGE\",\"files\":\"$FILE_ID\"}" \
                     https://slack.com/api/chat.postMessage)
                   
                   echo "Share response: $SHARE_RESPONSE"
