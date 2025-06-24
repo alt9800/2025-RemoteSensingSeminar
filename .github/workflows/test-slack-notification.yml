@@ -28,12 +28,12 @@ jobs:
     steps:
       - name: Show workflow version
         run: |
-          echo "📌 Workflow Version: 2.1.0"
+          echo "📌 Workflow Version: 3.0.0"
           echo "📅 Updated: 2025-01-25"
-          echo "🔧 Fix: Content-Type charset追加、curl送信方法の改善"
+          echo "🔧 Fix: Form data形式でのAPI呼び出しに変更（JSONではなくForm data）"
           echo ""
-          echo "## 📌 Workflow Version 2.1.0" >> $GITHUB_STEP_SUMMARY
-          echo "Updated: 2025-01-25 - Content-Type charset追加、curl送信方法の改善" >> $GITHUB_STEP_SUMMARY
+          echo "## 📌 Workflow Version 3.0.0" >> $GITHUB_STEP_SUMMARY
+          echo "Updated: 2025-01-25 - Form data形式でのAPI呼び出しに変更" >> $GITHUB_STEP_SUMMARY
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -222,25 +222,16 @@ jobs:
                 ERROR_MSG=$(echo "$COMPLETE_RESPONSE" | jq -r '.error // "unknown"')
                 echo "❌ Failed to complete upload: $ERROR_MSG"
                 
-                # Method 2: 代替方法
+                # Method 2: 代替方法 - completeUploadExternalもForm dataで試す
                 echo "🔄 Trying alternative method..."
                 
-                # アップロードのみ完了
-                COMPLETE_ONLY_JSON=$(jq -n \
-                  --arg file_id "$FILE_ID" \
-                  --arg title "テスト用スライド ($TARGET_DATE)" \
-                  '{
-                    files: [{
-                      id: $file_id,
-                      title: $title
-                    }]
-                  }')
-                
+                # アップロードのみ完了（Form data形式）
                 COMPLETE_ONLY_RESPONSE=$(curl -s -X POST \
                   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-                  -H "Content-Type: application/json" \
-                  -d "$COMPLETE_ONLY_JSON" \
+                  -F "files=[{\"id\":\"$FILE_ID\",\"title\":\"テスト用スライド ($TARGET_DATE)\"}]" \
                   https://slack.com/api/files.completeUploadExternal)
+                
+                echo "Complete only response: $COMPLETE_ONLY_RESPONSE"
                 
                 if echo "$COMPLETE_ONLY_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
                   echo "✅ Upload completed, now sharing..."
