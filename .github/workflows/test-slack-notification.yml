@@ -26,6 +26,15 @@ jobs:
   test-notification:
     runs-on: ubuntu-latest
     steps:
+      - name: Show workflow version
+        run: |
+          echo "📌 Workflow Version: 2.0.0"
+          echo "📅 Updated: 2025-01-25"
+          echo "🔧 Fix: JSON送信形式の修正、メッセージ簡素化"
+          echo ""
+          echo "## 📌 Workflow Version 2.0.0" >> $GITHUB_STEP_SUMMARY
+          echo "Updated: 2025-01-25 - JSON送信形式の修正" >> $GITHUB_STEP_SUMMARY
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -42,6 +51,10 @@ jobs:
 
       - name: Install Marp CLI
         run: npm install -g @marp-team/marp-cli
+
+      - name: Install jq for JSON processing
+        run: |
+          sudo apt-get install -y jq
 
       - name: Determine target date
         id: target
@@ -127,10 +140,11 @@ jobs:
           SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
         run: |
           TARGET_DATE="${{ steps.target.outputs.target_date }}"
-          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M JST')
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
           TEST_MSG="${{ github.event.inputs.test_message }}"
           
           echo "🤖 Testing Bot Token notification with PDF upload..."
+          echo "   Version: 2.0.0"
           echo "   Target date: $TARGET_DATE"
           echo "   Channel: $SLACK_CHANNEL"
           
@@ -142,40 +156,43 @@ jobs:
           FILE_SIZE=$(stat -c%s "test-output/test-$TARGET_DATE.pdf")
           echo "📊 File size: $FILE_SIZE bytes"
           
-          # メッセージテキストを準備
-          MESSAGE_TEXT="$TEST_MSG - $CURRENT_TIME
-          
-          📋 レビューポイント:
-          • 内容の正確性
-          • 説明の分かりやすさ
-          • 時間配分
-          • スライドデザイン
-          
-          💬 フィードバック方法: このスレッドにコメントをお願いします
-          
+          # シンプルなメッセージテキスト
+          MESSAGE_TEXT="$TEST_MSG v2.0.0 - $CURRENT_TIME
+          PDF: $TARGET_DATE
           ⚠️ これはテスト通知です"
           
-          # Method 1: 推奨される方法 - completeUploadExternalでチャンネル共有も同時に行う
+          # Method 1: 推奨される方法 - jqを使用してJSONを生成
           echo "📤 Attempting PDF file upload with direct channel sharing..."
           
-          # Step 1: アップロードURLを取得
-          echo "Step 1: Getting upload URL..."
+          # Step 1: アップロードURLを取得（jqを使用）
+          echo "Step 1: Getting upload URL (using jq)..."
+          
+          # JSONデータを作成
+          UPLOAD_JSON=$(jq -n \
+            --arg filename "test-slide-$TARGET_DATE.pdf" \
+            --arg length "$FILE_SIZE" \
+            --arg alt_txt "$TARGET_DATE のスライド" \
+            '{filename: $filename, length: ($length | tonumber), alt_txt: $alt_txt}')
+          
+          echo "Upload JSON: $UPLOAD_JSON"
+          
           UPLOAD_URL_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
             -H "Content-Type: application/json" \
-            --data-raw "{\"filename\":\"test-slide-$TARGET_DATE.pdf\",\"length\":$FILE_SIZE,\"alt_txt\":\"$TARGET_DATE のスライド\"}" \
+            -d "$UPLOAD_JSON" \
             https://slack.com/api/files.getUploadURLExternal)
           
           echo "Upload URL response: $UPLOAD_URL_RESPONSE"
           
           # レスポンスを確認
-          if echo "$UPLOAD_URL_RESPONSE" | grep -q '"ok":true'; then
+          if echo "$UPLOAD_URL_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
             # JSONから値を安全に抽出
-            UPLOAD_URL=$(echo "$UPLOAD_URL_RESPONSE" | sed -n 's/.*"upload_url":"\([^"]*\)".*/\1/p')
-            FILE_ID=$(echo "$UPLOAD_URL_RESPONSE" | sed -n 's/.*"file_id":"\([^"]*\)".*/\1/p')
+            UPLOAD_URL=$(echo "$UPLOAD_URL_RESPONSE" | jq -r '.upload_url')
+            FILE_ID=$(echo "$UPLOAD_URL_RESPONSE" | jq -r '.file_id')
             
             echo "✅ Upload URL obtained"
             echo "   File ID: $FILE_ID"
+            echo "   Upload URL: ${UPLOAD_URL:0:50}..."
             
             # Step 2: ファイルをアップロード
             echo "Step 2: Uploading file..."
@@ -190,52 +207,85 @@ jobs:
               # Step 3: アップロード完了とチャンネル共有を同時に実行
               echo "Step 3: Completing upload and sharing to channel..."
               
-              # メッセージテキストをエスケープ
-              ESCAPED_MESSAGE=$(echo "$MESSAGE_TEXT" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+              # completeUploadExternalのJSONを作成
+              COMPLETE_JSON=$(jq -n \
+                --arg file_id "$FILE_ID" \
+                --arg title "テスト用スライド ($TARGET_DATE)" \
+                --arg channel "$SLACK_CHANNEL" \
+                --arg comment "$MESSAGE_TEXT" \
+                '{
+                  files: [{
+                    id: $file_id,
+                    title: $title
+                  }],
+                  channel_id: $channel,
+                  initial_comment: $comment
+                }')
+              
+              echo "Complete JSON: $COMPLETE_JSON"
               
               COMPLETE_RESPONSE=$(curl -s -X POST \
                 -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                 -H "Content-Type: application/json" \
-                --data-raw "{\"files\":[{\"id\":\"$FILE_ID\",\"title\":\"テスト用スライド ($TARGET_DATE)\"}],\"channel_id\":\"$SLACK_CHANNEL\",\"initial_comment\":\"$ESCAPED_MESSAGE\"}" \
+                -d "$COMPLETE_JSON" \
                 https://slack.com/api/files.completeUploadExternal)
               
               echo "Complete upload response: $COMPLETE_RESPONSE"
               
-              if echo "$COMPLETE_RESPONSE" | grep -q '"ok":true'; then
+              if echo "$COMPLETE_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
                 echo "🎉 PDF upload and sharing successful!"
                 echo "✅ File has been uploaded and shared to the channel"
               else
-                ERROR_MSG=$(echo "$COMPLETE_RESPONSE" | sed -n 's/.*"error":"\([^"]*\)".*/\1/p')
+                ERROR_MSG=$(echo "$COMPLETE_RESPONSE" | jq -r '.error // "unknown"')
                 echo "❌ Failed to complete upload: $ERROR_MSG"
                 
-                # Method 2: 代替方法 - まずcompleteUploadExternalしてからchat.postMessageで共有
+                # Method 2: 代替方法
                 echo "🔄 Trying alternative method..."
                 
                 # アップロードのみ完了
+                COMPLETE_ONLY_JSON=$(jq -n \
+                  --arg file_id "$FILE_ID" \
+                  --arg title "テスト用スライド ($TARGET_DATE)" \
+                  '{
+                    files: [{
+                      id: $file_id,
+                      title: $title
+                    }]
+                  }')
+                
                 COMPLETE_ONLY_RESPONSE=$(curl -s -X POST \
                   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                   -H "Content-Type: application/json" \
-                  --data-raw "{\"files\":[{\"id\":\"$FILE_ID\",\"title\":\"テスト用スライド ($TARGET_DATE)\"}]}" \
+                  -d "$COMPLETE_ONLY_JSON" \
                   https://slack.com/api/files.completeUploadExternal)
                 
-                if echo "$COMPLETE_ONLY_RESPONSE" | grep -q '"ok":true'; then
+                if echo "$COMPLETE_ONLY_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
                   echo "✅ Upload completed, now sharing..."
                   
                   # chat.postMessageでファイルを共有
+                  SHARE_JSON=$(jq -n \
+                    --arg channel "$SLACK_CHANNEL" \
+                    --arg text "$MESSAGE_TEXT" \
+                    --arg files "$FILE_ID" \
+                    '{
+                      channel: $channel,
+                      text: $text,
+                      files: $files
+                    }')
+                  
                   SHARE_RESPONSE=$(curl -s -X POST \
                     -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                     -H "Content-Type: application/json" \
-                    --data-raw "{\"channel\":\"$SLACK_CHANNEL\",\"text\":\"$ESCAPED_MESSAGE\",\"files\":\"$FILE_ID\"}" \
+                    -d "$SHARE_JSON" \
                     https://slack.com/api/chat.postMessage)
                   
                   echo "Share response: $SHARE_RESPONSE"
                   
-                  if echo "$SHARE_RESPONSE" | grep -q '"ok":true'; then
+                  if echo "$SHARE_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
                     echo "🎉 Alternative method successful!"
                   else
-                    echo "❌ Alternative method also failed"
-                    ERROR_MSG=$(echo "$SHARE_RESPONSE" | sed -n 's/.*"error":"\([^"]*\)".*/\1/p')
-                    echo "   Error: $ERROR_MSG"
+                    ERROR_MSG=$(echo "$SHARE_RESPONSE" | jq -r '.error // "unknown"')
+                    echo "❌ Alternative method also failed: $ERROR_MSG"
                   fi
                 fi
               fi
@@ -243,8 +293,12 @@ jobs:
               echo "❌ File upload failed (HTTP $UPLOAD_STATUS)"
             fi
           else
-            ERROR_MSG=$(echo "$UPLOAD_URL_RESPONSE" | sed -n 's/.*"error":"\([^"]*\)".*/\1/p')
+            ERROR_MSG=$(echo "$UPLOAD_URL_RESPONSE" | jq -r '.error // "unknown"')
             echo "❌ Failed to get upload URL: $ERROR_MSG"
+            
+            # デバッグ情報
+            echo "Debug: Raw curl command test..."
+            echo '{"filename":"test.pdf","length":123456}' | jq .
           fi
           
           # Method 3: フォールバック - リンク送信
@@ -252,22 +306,9 @@ jobs:
           echo "🔄 Fallback: Sending message with GitHub Pages link..."
           
           GITHUB_LINK="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/slides/$TARGET_DATE.pdf"
-          FALLBACK_MESSAGE=$(cat <<EOF
-          $TEST_MSG - $CURRENT_TIME
-          
-          📋 レビューポイント:
-          • 内容の正確性
-          • 説明の分かりやすさ
-          • 時間配分
-          • スライドデザイン
-          
-          💬 フィードバック方法: このスレッドにコメントをお願いします
-          
-          📎 PDFリンク: $GITHUB_LINK
-          
-          ⚠️ これはテスト通知です（フォールバック）
-          EOF
-          )
+          FALLBACK_MESSAGE="$TEST_MSG v2.0.0 - $CURRENT_TIME
+          📎 PDF: $GITHUB_LINK
+          ⚠️ テスト通知（フォールバック）"
           
           FALLBACK_JSON=$(jq -n \
             --arg channel "$SLACK_CHANNEL" \
@@ -282,10 +323,11 @@ jobs:
           
           echo "Fallback response: $FALLBACK_RESPONSE"
           
-          if echo "$FALLBACK_RESPONSE" | grep -q '"ok":true'; then
+          if echo "$FALLBACK_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
             echo "✅ Fallback message sent successfully"
           else
-            echo "❌ Fallback also failed"
+            ERROR_MSG=$(echo "$FALLBACK_RESPONSE" | jq -r '.error // "unknown"')
+            echo "❌ Fallback also failed: $ERROR_MSG"
           fi
 
       - name: Test Webhook notification
@@ -295,54 +337,14 @@ jobs:
         run: |
           TARGET_DATE="${{ steps.target.outputs.target_date }}"
           PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M JST')
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
           TEST_MSG="${{ github.event.inputs.test_message }}"
           
-          echo "🪝 Testing Webhook notification..."
+          echo "🪝 Testing Webhook notification (v2.0.0)..."
           
           curl -X POST -H 'Content-type: application/json' \
             --data "{
-              \"blocks\": [
-                {
-                  \"type\": \"section\",
-                  \"text\": {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"$TEST_MSG - Webhook テスト\\n\\n${CURRENT_TIME} 時点での資料はこちらです。レビューをお願いします。\"
-                  }
-                },
-                {
-                  \"type\": \"section\",
-                  \"text\": {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"📋 レビューポイント:\\n• 内容の正確性\\n• 説明の分かりやすさ\\n• 時間配分\\n• スライドデザイン\"
-                  }
-                },
-                {
-                  \"type\": \"actions\",
-                  \"elements\": [
-                    {
-                      \"type\": \"button\",
-                      \"text\": { \"type\": \"plain_text\", \"text\": \"📄 PDFダウンロード\" },
-                      \"url\": \"${PAGES_URL}/slides/${TARGET_DATE}.pdf\",
-                      \"style\": \"primary\"
-                    },
-                    {
-                      \"type\": \"button\",
-                      \"text\": { \"type\": \"plain_text\", \"text\": \"📊 HTMLプレビュー\" },
-                      \"url\": \"${PAGES_URL}/slides/${TARGET_DATE}.html\"
-                    }
-                  ]
-                },
-                {
-                  \"type\": \"context\",
-                  \"elements\": [
-                    {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"⚠️ これはテスト通知です | 💬 このスレッドにフィードバックをお願いします\"
-                    }
-                  ]
-                }
-              ]
+              \"text\": \"$TEST_MSG v2.0.0 - Webhook\\n$CURRENT_TIME\\n<${PAGES_URL}/slides/${TARGET_DATE}.pdf|📄 PDF> | <${PAGES_URL}/slides/${TARGET_DATE}.html|📊 HTML>\"
             }" \
             $SLACK_WEBHOOK_URL
           
@@ -361,40 +363,12 @@ jobs:
           PAGES_URL="https://alt9800.github.io/2025-RemoteSensingSeminar"
           TEST_MSG="${{ github.event.inputs.test_message }}"
           
-          echo "📭 Testing no-slide notification..."
+          echo "📭 Testing no-slide notification (v2.0.0)..."
           
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
             curl -X POST -H 'Content-type: application/json' \
               --data "{
-                \"blocks\": [
-                  {
-                    \"type\": \"section\",
-                    \"text\": {
-                      \"type\": \"mrkdwn\",
-                      \"text\": \"$TEST_MSG - スライドなし通知テスト\\n\\n⚠️ **レビュー通知**\\n\\nまだ出来上がってないみたいです、少々お待ちください...\"
-                    }
-                  },
-                  {
-                    \"type\": \"actions\",
-                    \"elements\": [
-                      {
-                        \"type\": \"button\",
-                        \"text\": { \"type\": \"plain_text\", \"text\": \"📋 資料サイトで確認\" },
-                        \"url\": \"${PAGES_URL}\",
-                        \"style\": \"primary\"
-                      }
-                    ]
-                  },
-                  {
-                    \"type\": \"context\",
-                    \"elements\": [
-                      {
-                        \"type\": \"mrkdwn\",
-                        \"text\": \"⚠️ これはテスト通知です | 📝 資料の準備ができ次第、改めてレビュー依頼をお送りします\"
-                      }
-                    ]
-                  }
-                ]
+                \"text\": \"$TEST_MSG v2.0.0 - スライドなし\\n⚠️ まだ準備中です\\n<${PAGES_URL}|📋 資料サイト>\"
               }" \
               $SLACK_WEBHOOK_URL
             
@@ -410,7 +384,7 @@ jobs:
       - name: Test summary
         if: always()
         run: |
-          echo "## 🧪 Slack通知テスト結果" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧪 Slack通知テスト結果 (v2.0.0)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**テスト実行日時:** $(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M JST')" >> $GITHUB_STEP_SUMMARY
           echo "**対象日付:** ${{ steps.target.outputs.target_date }}" >> $GITHUB_STEP_SUMMARY
