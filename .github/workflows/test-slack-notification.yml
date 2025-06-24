@@ -28,12 +28,12 @@ jobs:
     steps:
       - name: Show workflow version
         run: |
-          echo "📌 Workflow Version: 2.0.0"
+          echo "📌 Workflow Version: 2.1.0"
           echo "📅 Updated: 2025-01-25"
-          echo "🔧 Fix: JSON送信形式の修正、メッセージ簡素化"
+          echo "🔧 Fix: Content-Type charset追加、curl送信方法の改善"
           echo ""
-          echo "## 📌 Workflow Version 2.0.0" >> $GITHUB_STEP_SUMMARY
-          echo "Updated: 2025-01-25 - JSON送信形式の修正" >> $GITHUB_STEP_SUMMARY
+          echo "## 📌 Workflow Version 2.1.0" >> $GITHUB_STEP_SUMMARY
+          echo "Updated: 2025-01-25 - Content-Type charset追加、curl送信方法の改善" >> $GITHUB_STEP_SUMMARY
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -207,27 +207,10 @@ jobs:
               # Step 3: アップロード完了とチャンネル共有を同時に実行
               echo "Step 3: Completing upload and sharing to channel..."
               
-              # completeUploadExternalのJSONを作成
-              COMPLETE_JSON=$(jq -n \
-                --arg file_id "$FILE_ID" \
-                --arg title "テスト用スライド ($TARGET_DATE)" \
-                --arg channel "$SLACK_CHANNEL" \
-                --arg comment "$MESSAGE_TEXT" \
-                '{
-                  files: [{
-                    id: $file_id,
-                    title: $title
-                  }],
-                  channel_id: $channel,
-                  initial_comment: $comment
-                }')
-              
-              echo "Complete JSON: $COMPLETE_JSON"
-              
               COMPLETE_RESPONSE=$(curl -s -X POST \
                 -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$COMPLETE_JSON" \
+                -H "Content-Type: application/json; charset=utf-8" \
+                --data-raw "{\"files\":[{\"id\":\"$FILE_ID\",\"title\":\"Test PDF v2.1.0\"}],\"channel_id\":\"$SLACK_CHANNEL\",\"initial_comment\":\"$MESSAGE_TEXT\"}" \
                 https://slack.com/api/files.completeUploadExternal)
               
               echo "Complete upload response: $COMPLETE_RESPONSE"
@@ -293,12 +276,28 @@ jobs:
               echo "❌ File upload failed (HTTP $UPLOAD_STATUS)"
             fi
           else
-            ERROR_MSG=$(echo "$UPLOAD_URL_RESPONSE" | jq -r '.error // "unknown"')
-            echo "❌ Failed to get upload URL: $ERROR_MSG"
+          # 最終デバッグ情報
+          if ! echo "$UPLOAD_URL_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
+            echo ""
+            echo "❌ All methods failed to get upload URL"
+            echo ""
+            echo "Debug: Testing basic API connection..."
+            # APIの基本的な接続テスト
+            AUTH_TEST=$(curl -s -X POST \
+              -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              https://slack.com/api/auth.test)
             
-            # デバッグ情報
-            echo "Debug: Raw curl command test..."
-            echo '{"filename":"test.pdf","length":123456}' | jq .
+            echo "Auth test response: $AUTH_TEST"
+            
+            if echo "$AUTH_TEST" | jq -e '.ok == true' > /dev/null 2>&1; then
+              echo "✅ Bot token is valid"
+              echo "User ID: $(echo "$AUTH_TEST" | jq -r '.user_id')"
+              echo "Team: $(echo "$AUTH_TEST" | jq -r '.team')"
+            else
+              echo "❌ Bot token may be invalid"
+            fi
+          fi
           fi
           
           # Method 3: フォールバック - リンク送信
