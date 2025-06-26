@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TZ: 'Asia/Tokyo'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -166,7 +168,7 @@ jobs:
             fi
           done
           
-          echo "<div class=\"updated\">最終更新: $(date '+%Y年%m月%d日 %H:%M')</div>" >> output/index.html
+          echo "<div class=\"updated\">最終更新: $(TZ='Asia/Tokyo' date '+%Y年%m月%d日 %H:%M') (JST)</div>" >> output/index.html
           echo "</div></body></html>" >> output/index.html
 
       - name: Deploy to GitHub Pages
