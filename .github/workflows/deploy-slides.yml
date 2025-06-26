@@ -121,9 +121,9 @@ jobs:
                   --allow-local-files \
                   --output "docs/slides/$DATE_DIR.html"
                 
-                # PDF生成（元のパス使用、workdir変更）
+                # PDF生成（元のディレクトリで slide.md を明示的に指定）
                 cd "$DATE_DIR"
-                marp "slide.md" \
+                marp slide.md \
                   --pdf \
                   --allow-local-files \
                   --output "../docs/slides/$DATE_DIR.pdf"
