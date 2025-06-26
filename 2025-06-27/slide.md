@@ -82,6 +82,81 @@ MapLibre GL JS を例に、Webフロントエンドにおけるデファクト�
 
 ---
 
+## npmを使って読み込む
+
+(Node.jsをインストールしている前提で)
+
+npm install maplibre-gl
+
+
+
+
+---
+
+## npmを使うとなにが嬉しいか
+
+npmを用いることで一通りライブラリをPCの中にインストールして置けるので、インターネットがない環境でもローカルにおける開発をすることができる。
+
+
+---
+
+
+```html:index.html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>MapLibre GL JS - npm版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="main.js"></script>
+</body>
+</html>
+
+```
+
+---
+
+```js:main.js
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+    center: [139.7670, 35.6814], // 東京駅
+    zoom: 10
+});
+
+// ナビゲーションコントロールを追加
+map.addControl(new maplibregl.NavigationControl());
+
+// 地図の読み込み完了時の処理
+map.on('load', () => {
+    console.log('地図の読み込みが完了しました');
+});
+
+```
+
+
+---
+
+## 実際に実行してみましょう
+
+
+
+
+---
+
+* jsの名前はmain.jsやindex.jsが好まれます。
+* scriptディレクトリを作成し、その中にコレクションしても良いですし、htmlと同階層においてもOK。
+
 
 ---
 
@@ -94,7 +169,10 @@ MapLibre GL JS を例に、Webフロントエンドにおけるデファクト�
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 
+---
 
+
+## 
 
 
 ---
@@ -151,3 +229,49 @@ Node.jsにおいてはJSをコンピュータ内が解釈できる形にして�
 Javascriptの実行環境としては最近では DenoやBunのような代替が誕生しています。
 DenoではTypeScriptがサポートされていたり、ライブラリの導入がかなり簡略化されていて、パッケージ管理が楽になっています。また、マルチスレッドであるため、並列なプログラミングを行うことができます。
 BunはそもそもZigによって処理を高速化しているのでかなりハイパフォーマンスな実行速度を誇ります。JavaScirptの実行環境としても、バンドル速度としても、既存のランタイムと差別化できていると言えるでしょう。
+
+
+
+---
+
+## npmを利用してJavascriptをサーバーサイドで動かしてみよう
+
+
+
+
+---
+
+## TypeScriptも動かせます
+
+
+---
+
+## node_moduleとは
+
+
+
+---
+
+## package.jsonとは
+
+
+---
+
+
+使いやすい書籍
+
+
+
+ハンズオンJavaScript オライリー
+https://www.oreilly.co.jp/books/9784873119229/
+どのような感じでJavascriptが動いているか、標準ライブラリにはどのようなものがあるか(Javascriptがどのようなことができるか)といったことがサーバーサイドJSのベテランの目線でまとまっています。
+
+
+現場のプロがわかりやすく教える 位置情報エンジニア養成講座 秀和システム
+https://www.shuwasystem.co.jp/book/9784798068923.html
+MapLibreを活用したWebフロントについての詳細な解説がなされています。
+
+
+これからWebをはじめる人のHTML＆CSS、JavaScriptのきほんのきほん マイナビブックス
+https://book.mynavi.jp/ec/products/detail/id=65861
+社内に広く、マークアップから動的なWebについて伝える際にあると便利な一冊です。
