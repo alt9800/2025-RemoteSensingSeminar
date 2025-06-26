@@ -1,306 +1,177 @@
----
-marp: true
-theme: default
-header: "衛星データ解析技術研究会<br>技術セミナー（応用編）"
-footer: "第二回 2025/06/27"
-
-paginate: true
-
-style: |
-    section.title {
-        justify-content: center;
-        text-align: left;
-    }
-    .round-icon {
-      position: absolute;
-      top: 50px;
-      right: 50px;
-      width: 400px;
-      height: 400px;
-      border-radius: 20%;
-      object-fit: cover;
-      z-index: 10;
-    }
-    .tiny-text {
-    font-size: 0.6em;  /* 通常の60%サイズ */
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-      image-rendering: -webkit-optimize-contrast;
-    }
-
-
-
----
-# 衛星データ解析技術研究会<br>技術セミナー（応用編）
-## Webアプリケーションの開発技術の習得
-
-第二回 2025/06/27
-
-担当講師 : 田中聡至
-
----
-
-## 本日のテーマ
-
-## MapLibreを用いたWebGISのフロントエンド開発
-
-MapLibre GL JS を例に、Webフロントエンドにおけるデファクトスタンダードな地理空間情報処理を平易に体験することを目標とする。
-
----
-
-13:30-13:40	イントロ : 先週の振り返りや質問対応
-13:40-14:30	MapLibreを動かすまでの設定
-14:30-14:45	色々なデータが読み込めることを見てみよう
-14:45-14:50	-----(休憩)-----
-14:50-15:30	Leafletや他のライブラリとの比較をしてみよう
-15:30-16:00	(プチアイディアソン) システムを思案しよう
-
----
-
-# MapLibre GL JSとは？
-
-
-
-
----
-
-## MapLibre　GL JSを導入しよう
-
----
-
-
-
-
-二種類の読み込み方が可能です。
-
-* npm
-* CDN
-
-
----
-
-## npmを使って読み込む
-
-(Node.jsをインストールしている前提で)
-
-npm install maplibre-gl
-
-
-
-
----
-
-## npmを使うとなにが嬉しいか
-
-npmを用いることで一通りライブラリをPCの中にインストールして置けるので、インターネットがない環境でもローカルにおける開発をすることができる。
-
-
----
-
-
-```html:index.html
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>MapLibre GL JS - npm版</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { margin: 0; padding: 0; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script src="main.js"></script>
-</body>
-</html>
-
-```
-
----
-
-```js:main.js
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-const map = new maplibregl.Map({
-    container: 'map',
-    style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
-    center: [139.7670, 35.6814], // 東京駅
-    zoom: 10
-});
-
-// ナビゲーションコントロールを追加
-map.addControl(new maplibregl.NavigationControl());
-
-// 地図の読み込み完了時の処理
-map.on('load', () => {
-    console.log('地図の読み込みが完了しました');
-});
-
-```
-
-
----
-
-## 実際に実行してみましょう
-
-
-```bash
-npm install --save-dev parcel
-
-```
-
-
-```package.json
-{
-    "scripts": {
-        "dev": "parcel index.html",
-        "build": "parcel build index.html"
-    }
-}
-```
-
-
----
-
-* jsの名前はmain.jsやindex.jsが好まれます。
-* scriptディレクトリを作成し、その中にコレクションしても良いですし、htmlと同階層においてもOK。
-
-
----
-
-
-
-## CDNから読み込む
-
-`<head>`タグの中で記述することでライブラリを読み込み読み込めます。
-
-<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-
----
-
-
-## 
-
-
----
-
-# 補足記事
-
-
----
-
-
-# npmとは？　(Node Package Manage)
-JavaScriptのパッケージ管理ツールで、Node.jsのエコシステムにおいて、ライブラリのインストールや管理、共有を行うことができます。
-(他の開発者と環境を揃えることに役に立つ。)
-
-2009年にNode.jsが登場したのち、次の年にはnpmはリリースされていたようです。
-
-
----
-
-
-# CDNとは？ (Content Delivery Network)
-Webコンテンツをインターネット系で配信/利用するために用意されたネットワーク網のこと。
-ネットワーク網の中で負荷分散がされることによって、アクセスの集中などに強く、静的なコンテンツをアプリケーションサーバーでの処理を介さずに返すことができる。
-Web開発の文脈では、CDNやJSを配信することで、html内から呼び出して、適用することができる。
-
-類似技術 : Webサーバー(NGINXなど)、DNS
-
-
----
-## CDNのサービス
-
-* jsDelivr
-* CDNJS 
-* unpkg
-* Cloudflare
-* Akamai 
-* Fastly
-* Microsoft Azure / Google Cloud / AWS にもそれぞれサービスがあります。
-
-
----
-
-# Javascriptが動く仕組み
-
-Javascriptも機械語にコンパイルすることでコンピュータに解釈され動作します。
-特に、Javacriptは「ブラウザ」によってコンパイルされ処理を返すことができることが特徴です。
-Node.jsにおいてはJSをコンピュータ内が解釈できる形にして処理を返す点は他の高級言語(C、Python、Rubyなど)と同様といえます。
-コンパイラとしてV8エンジンがNode.jsやChrome(Chromium)では活用されています。(Google Apps ScriptでもV8エンジンでJavacriptを利用しているそうです。)
-
-
----
-
-## ランタイムについて
-
-Javascriptの実行環境としては最近では DenoやBunのような代替が誕生しています。
-DenoではTypeScriptがサポートされていたり、ライブラリの導入がかなり簡略化されていて、パッケージ管理が楽になっています。また、マルチスレッドであるため、並列なプログラミングを行うことができます。
-BunはそもそもZigによって処理を高速化しているのでかなりハイパフォーマンスな実行速度を誇ります。JavaScirptの実行環境としても、バンドル速度としても、既存のランタイムと差別化できていると言えるでしょう。
-
-
-
----
-
-## npmを利用してJavascriptをサーバーサイドで動かしてみよう
-
-
-
-
----
-
-## TypeScriptも動かせます
-
-
----
-
-## node_moduleとは
-
-
-
----
-
-## package.jsonとは
-
-
----
-
-## JSONとはどのような構造か
-
-
----
-
-
-使いやすい書籍
-
-
-
-ハンズオンJavaScript オライリー
-https://www.oreilly.co.jp/books/9784873119229/
-どのような感じでJavascriptが動いているか、標準ライブラリにはどのようなものがあるか(Javascriptがどのようなことができるか)といったことがサーバーサイドJSのベテランの目線でまとまっています。
-
-
-現場のプロがわかりやすく教える 位置情報エンジニア養成講座 秀和システム
-https://www.shuwasystem.co.jp/book/9784798068923.html
-MapLibreを活用したWebフロントについての詳細な解説がなされています。
-
-
-これからWebをはじめる人のHTML＆CSS、JavaScriptのきほんのきほん マイナビブックス
-https://book.mynavi.jp/ec/products/detail/id=65861
-社内に広く、マークアップから動的なWebについて伝える際にあると便利な一冊です。
-
-
-
----
-
-
-## 今週のジオニュース
-
-帝国書院さんのジオグラフ (2021)がにわかに盛り上がっている
-https://www.geograph.teikokushoin.co.jp
+name: Deploy Seminar Materials
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '*/slide.md'
+      - '*/handson/**'
+      - '*/assets/**'
+      - '.github/workflows/deploy-seminar-materials.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
+          npm install -g @marp-team/marp-cli
+
+      - name: Build all materials
+        run: |
+          # 出力ディレクトリを作成
+          mkdir -p output/slides
+          mkdir -p output/handson
+          
+          # 全ての日付ディレクトリを処理
+          for DATE_DIR in $(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort); do
+            echo "Processing $DATE_DIR..."
+            
+            # スライド生成
+            if [ -f "$DATE_DIR/slide.md" ]; then
+              echo "- Generating slides..."
+              
+              # アセットディレクトリを作成
+              mkdir -p "output/slides/$DATE_DIR"
+              
+              # アセットと画像をコピー
+              if [ -d "$DATE_DIR/assets" ]; then
+                cp -r "$DATE_DIR/assets" "output/slides/$DATE_DIR/"
+              fi
+              
+              # 画像ファイルをコピー
+              find "$DATE_DIR" -maxdepth 1 -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) -exec cp {} "output/slides/$DATE_DIR/" \;
+              
+              # Marpでスライド生成（シンプルなコマンド）
+              cd "$DATE_DIR" && marp slide.md -o "../output/slides/$DATE_DIR.html" --html && cd ..
+              cd "$DATE_DIR" && marp slide.md -o "../output/slides/$DATE_DIR.pdf" --pdf && cd ..
+              
+              # HTMLの画像パスを修正
+              sed -i "s|src=\"\([^\"]*\)\"|src=\"$DATE_DIR/\1\"|g" "output/slides/$DATE_DIR.html"
+              sed -i "s|src=\"assets/|src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.html"
+            fi
+            
+            # ハンズオン資料をコピー
+            if [ -d "$DATE_DIR/handson" ]; then
+              echo "- Copying handson materials..."
+              cp -r "$DATE_DIR/handson" "output/handson/$DATE_DIR"
+            fi
+          done
+
+      - name: Generate index page
+        run: |
+          cat > output/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>📚 セミナー資料</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                      max-width: 1200px;
+                      margin: 0 auto;
+                      padding: 20px;
+                      background: #f5f5f5;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 30px;
+                      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                  }
+                  h1 {
+                      text-align: center;
+                      color: #333;
+                  }
+                  .seminar {
+                      border: 1px solid #ddd;
+                      border-radius: 8px;
+                      padding: 20px;
+                      margin: 15px 0;
+                      background: #fafafa;
+                  }
+                  .seminar h2 {
+                      margin-top: 0;
+                      color: #0366d6;
+                  }
+                  .links {
+                      display: flex;
+                      gap: 10px;
+                      flex-wrap: wrap;
+                  }
+                  .links a {
+                      display: inline-block;
+                      padding: 8px 16px;
+                      background: #0366d6;
+                      color: white;
+                      text-decoration: none;
+                      border-radius: 5px;
+                      transition: background 0.3s;
+                  }
+                  .links a:hover {
+                      background: #0256cc;
+                  }
+                  .links a.pdf {
+                      background: #d73a49;
+                  }
+                  .links a.pdf:hover {
+                      background: #cb2431;
+                  }
+                  .links a.handson {
+                      background: #28a745;
+                  }
+                  .links a.handson:hover {
+                      background: #218838;
+                  }
+                  .updated {
+                      text-align: center;
+                      color: #666;
+                      margin-top: 30px;
+                      font-size: 14px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>📚 セミナー資料</h1>
+          EOF
+          
+          # 各セミナーのリンクを生成
+          for DATE_DIR in $(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort -r); do
+            if [ -f "output/slides/$DATE_DIR.html" ] || [ -f "output/slides/$DATE_DIR.pdf" ] || [ -d "output/handson/$DATE_DIR" ]; then
+              echo "<div class=\"seminar\">" >> output/index.html
+              echo "  <h2>📅 $DATE_DIR</h2>" >> output/index.html
+              echo "  <div class=\"links\">" >> output/index.html
+              
+              [ -f "output/slides/$DATE_DIR.html" ] && echo "    <a href=\"slides/$DATE_DIR.html\">📊 スライド (HTML)</a>" >> output/index.html
+              [ -f "output/slides/$DATE_DIR.pdf" ] && echo "    <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> output/index.html
+              [ -d "output/handson/$DATE_DIR" ] && echo "    <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> output/index.html
+              
+              echo "  </div>" >> output/index.html
+              echo "</div>" >> output/index.html
+            fi
+          done
+          
+          echo "<div class=\"updated\">最終更新: $(date '+%Y年%m月%d日 %H:%M')</div>" >> output/index.html
+          echo "</div></body></html>" >> output/index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          force_orphan: true
