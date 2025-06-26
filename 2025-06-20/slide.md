@@ -131,7 +131,7 @@ https://www.youtube.com/playlist?list=PLIeYzABHCQiK98yjNNFDhAqcrP0QgqNwQ
 Leaflet + Firebase (FireStore , CloudStorage)
 https://project-4415519406887009516.web.app
 
-![](image.png)
+![](assets/image.png)
 
 
 ---
@@ -156,7 +156,7 @@ https://project-4415519406887009516.web.app
 # 自己紹介
 
 --- 
-<img src="./profile.jpg" class="round-icon">
+<img src="./assets/profile.jpg" class="round-icon">
 
 講師紹介 : 田中
 ✉️ : alt9800jp@gmail.com
@@ -266,7 +266,7 @@ https://2025-qzu7873.slack.com
 (招待リンク 6/23まで)
 https://join.slack.com/t/2025-qzu7873/shared_invite/zt-37bd1wauu-TtyFN30R9liuTNIf1b5z5Q
 
-![](image-QR-slack.png)
+![](assets/image-QR-slack.png)
 
 
 ---
@@ -348,7 +348,7 @@ Cursorとかでもいいですよ！
 
 # 参考までに田中の開発画面
 
-![w:800](image-editer.png)
+![w:800](assets/image-editer.png)
 
 ---
 
