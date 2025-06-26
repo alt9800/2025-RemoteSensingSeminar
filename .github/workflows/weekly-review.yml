@@ -1,11 +1,11 @@
 name: Weekly Slide Review
 on:
   schedule:
-    - cron: '0 3 * * 3' # 毎週水曜日 12:00 JST
+    - cron: '0 3 * * 4' # 毎週木曜日 12:00 JST
   workflow_dispatch:
     inputs:
       target_date:
-        description: 'レビュー対象の日付 (YYYY-MM-DD) - 空欄で最新'
+        description: 'レビュー対象の日付 (YYYY-MM-DD) - 空欄で次の金曜日'
         required: false
         type: string
       force_send:
@@ -13,6 +13,9 @@ on:
         required: false
         type: boolean
         default: false
+
+run-name: |
+  週次スライドレビュー ${{ inputs.target_date || '(次の金曜日)' }}
 
 jobs:
   review:
@@ -27,8 +30,6 @@ jobs:
           if [ $CURRENT_DATE -gt $END_DATE ]; then
             echo "🛑 セミナー期間終了: $CURRENT_DATE > $END_DATE"
             echo "period_active=false" >> $GITHUB_OUTPUT
-            
-            # 終了通知用のメッセージを準備
             echo "end_message=📚 セミナー期間が終了したため、このワークフローは停止されました。お疲れ様でした！" >> $GITHUB_OUTPUT
           else
             echo "✅ セミナー期間中: $CURRENT_DATE <= $END_DATE"
@@ -72,76 +73,68 @@ jobs:
         if: steps.period_check.outputs.period_active == 'true'
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup environment
         if: steps.period_check.outputs.period_active == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Japanese fonts
-        if: steps.period_check.outputs.period_active == 'true'
+        id: setup
         run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
-          fc-cache -fv
-
-      - name: Install Marp CLI
-        if: steps.period_check.outputs.period_active == 'true'
-        run: npm install -g @marp-team/marp-cli
-
-      - name: Determine target date
-        if: steps.period_check.outputs.period_active == 'true'
-        id: target
-        run: |
+          echo "🚀 Weekly Slide Review"
+          echo "📅 Form data方式でPDFアップロード"
+          
+          # 対象日付の決定（次の金曜日）
           if [ -n "${{ github.event.inputs.target_date }}" ]; then
             TARGET_DATE="${{ github.event.inputs.target_date }}"
           else
-            # 最新の日付ディレクトリを取得
-            TARGET_DATE=$(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r | head -n1 | sed 's|./||')
+            # 次の金曜日の日付を計算
+            TODAY=$(date '+%Y-%m-%d')
+            CURRENT_DOW=$(date '+%u')  # 1=月曜, 5=金曜
+            DAYS_TO_FRIDAY=$((5 - CURRENT_DOW))
+            
+            if [ $DAYS_TO_FRIDAY -le 0 ]; then
+              # 既に金曜日を過ぎている場合は、来週の金曜日
+              DAYS_TO_FRIDAY=$((7 + DAYS_TO_FRIDAY))
+            fi
+            
+            TARGET_DATE=$(date -d "$TODAY + $DAYS_TO_FRIDAY days" '+%Y-%m-%d')
           fi
           
           echo "target_date=$TARGET_DATE" >> $GITHUB_OUTPUT
-          echo "Target date: $TARGET_DATE"
+          echo "📁 Target: $TARGET_DATE"
           
-          # スライドファイルの存在確認
+          # ファイル存在確認
           if [ -f "$TARGET_DATE/slide.md" ]; then
             echo "slide_exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found slide.md in $TARGET_DATE"
+            echo "✅ slide.md found"
           else
             echo "slide_exists=false" >> $GITHUB_OUTPUT
-            echo "❌ slide.md not found in $TARGET_DATE"
+            echo "❌ slide.md not found"
           fi
 
-      - name: Generate review PDF
-        if: steps.target.outputs.slide_exists == 'true' && steps.period_check.outputs.period_active == 'true'
+      - name: Install dependencies
+        if: steps.period_check.outputs.period_active == 'true' && steps.setup.outputs.slide_exists == 'true'
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra jq
+          npm install -g @marp-team/marp-cli
+
+      - name: Generate PDF
+        if: steps.period_check.outputs.period_active == 'true' && steps.setup.outputs.slide_exists == 'true'
+        id: generate
+        run: |
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
           
-          echo "Generating review PDF for $TARGET_DATE..."
-          
-          # PDFディレクトリ作成
+          echo "📄 Generating PDF..."
           mkdir -p review-output
           
-          # PDF生成（元のディレクトリで実行して相対パス維持）
           cd "$TARGET_DATE"
-          marp "slide.md" \
+          marp slide.md \
             --pdf \
             --allow-local-files \
-            --output "../review-output/review-$TARGET_DATE.pdf"
+            --output "../review-output/slide-$TARGET_DATE.pdf"
           cd ..
           
-          # ファイルサイズチェック
-          PDF_SIZE=$(stat -c%s "review-output/review-$TARGET_DATE.pdf")
-          echo "PDF size: $PDF_SIZE bytes"
-          
-          # Slack用の制限チェック（10MB = 10485760 bytes）
-          if [ $PDF_SIZE -gt 10485760 ]; then
-            echo "⚠️ PDF size exceeds Slack limit (10MB)"
-            echo "pdf_too_large=true" >> $GITHUB_ENV
-          else
-            echo "✅ PDF size OK for Slack"
-            echo "pdf_too_large=false" >> $GITHUB_ENV
-          fi
+          PDF_SIZE=$(stat -c%s "review-output/slide-$TARGET_DATE.pdf")
+          echo "pdf_size=$PDF_SIZE" >> $GITHUB_OUTPUT
+          echo "✅ PDF generated: $PDF_SIZE bytes"
 
       - name: Determine notification method
         if: steps.period_check.outputs.period_active == 'true'
@@ -158,55 +151,104 @@ jobs:
             echo "❌ No Slack configuration found"
           fi
 
-      - name: Send Slack notification with PDF (Bot Token)
-        if: steps.target.outputs.slide_exists == 'true' && steps.notification.outputs.method == 'bot' && env.pdf_too_large == 'false' && steps.period_check.outputs.period_active == 'true'
+      - name: Upload PDF to Slack (Bot Token)
+        if: steps.setup.outputs.slide_exists == 'true' && steps.notification.outputs.method == 'bot' && steps.period_check.outputs.period_active == 'true'
+        id: upload
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ secrets.SLACK_REVIEW_CHANNEL }}
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
-          CURRENT_TIME=$(date '+%Y年%m月%d日 %H:%M JST')
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
+          PDF_SIZE="${{ steps.generate.outputs.pdf_size }}"
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M')
+          GITHUB_PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           
-          # メッセージ内容を変数に格納
-          MESSAGE="$CURRENT_TIME 時点での資料はこちらです。レビューをお願いします。
+          # メッセージ作成
+          MESSAGE="現時点で作成された部分のPDFを添付します。Slackのスレッドにコメントをお願いします🙏
+
+          サンプルコードの実装はこちら 👇
+          (デプロイ先) $GITHUB_PAGES_URL/handson/$TARGET_DATE/
+          (コード) https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/tree/main/$TARGET_DATE"
           
-          📋 レビューポイント:
-          • 内容の正確性
-          • 説明の分かりやすさ  
-          • 時間配分
-          • スライドデザイン
+          echo "🔄 Starting PDF upload process (${PDF_SIZE} bytes)..."
           
-          💬 フィードバック方法: このスレッドにコメントをお願いします
-          
-          よろしくお願いします！"
-          
-          # PDFをSlackにアップロード
-          UPLOAD_RESPONSE=$(curl -F file=@"review-output/review-$TARGET_DATE.pdf" \
-            -F channels="$SLACK_CHANNEL" \
-            -F title="📊 レビュー用スライド ($TARGET_DATE)" \
-            -F initial_comment="$MESSAGE" \
+          # Step 1: アップロードURL取得（Form data形式）
+          echo "Getting upload URL..."
+          UPLOAD_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            https://slack.com/api/files.upload)
+            -F "filename=slide-$TARGET_DATE.pdf" \
+            -F "length=$PDF_SIZE" \
+            https://slack.com/api/files.getUploadURLExternal)
           
-          echo "Slack upload response: $UPLOAD_RESPONSE"
-          
-          # アップロード成功確認
-          if echo "$UPLOAD_RESPONSE" | grep -q '"ok":true'; then
-            echo "✅ PDF successfully uploaded to Slack"
+          if echo "$UPLOAD_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
+            UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload_url')
+            FILE_ID=$(echo "$UPLOAD_RESPONSE" | jq -r '.file_id')
+            echo "✅ Got upload URL"
+            
+            # Step 2: ファイルアップロード
+            echo "Uploading file..."
+            HTTP_STATUS=$(curl -s -w "%{http_code}" -X POST \
+              -F "file=@review-output/slide-$TARGET_DATE.pdf" \
+              "$UPLOAD_URL" \
+              -o /dev/null)
+            
+            if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "201" ] || [ "$HTTP_STATUS" = "204" ]; then
+              echo "✅ File uploaded"
+              
+              # Step 3: アップロード完了とチャンネル共有
+              echo "Completing upload..."
+              
+              # メッセージ内の改行をエスケープ
+              ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed ':a;N;$!ba;s/\n/\\n/g')
+              
+              COMPLETE_RESPONSE=$(curl -s -X POST \
+                -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+                -H "Content-Type: application/json; charset=utf-8" \
+                --data-raw "{
+                  \"files\": [{
+                    \"id\": \"$FILE_ID\",
+                    \"title\": \"週次レビュー資料 - $TARGET_DATE\"
+                  }],
+                  \"channel_id\": \"$SLACK_CHANNEL\",
+                  \"initial_comment\": \"$ESCAPED_MESSAGE\"
+                }" \
+                https://slack.com/api/files.completeUploadExternal)
+              
+              if echo "$COMPLETE_RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
+                echo "🎉 SUCCESS! PDF uploaded and shared (${PDF_SIZE} bytes)"
+                echo "upload_success=true" >> $GITHUB_OUTPUT
+              else
+                echo "❌ Complete upload failed"
+                echo "Error: $(echo "$COMPLETE_RESPONSE" | jq -r '.error')"
+                echo "upload_success=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "❌ File upload failed (HTTP $HTTP_STATUS)"
+              echo "upload_success=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "❌ Failed to upload PDF to Slack"
-            echo "$UPLOAD_RESPONSE"
-            exit 1
+            echo "❌ Failed to get upload URL"
+            echo "Error: $(echo "$UPLOAD_RESPONSE" | jq -r '.error')"
+            echo "upload_success=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Send Slack notification with link (Webhook or large PDF)
-        if: steps.target.outputs.slide_exists == 'true' && (steps.notification.outputs.method == 'webhook' || env.pdf_too_large == 'true') && steps.period_check.outputs.period_active == 'true'
+      - name: Send notification with links (Webhook or upload failed)
+        if: steps.period_check.outputs.period_active == 'true' && (steps.notification.outputs.method == 'webhook' || (steps.setup.outputs.slide_exists == 'true' && steps.upload.outputs.upload_success == 'false'))
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
           PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          CURRENT_TIME=$(date '+%Y年%m月%d日 %H:%M JST')
+          CURRENT_TIME=$(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M')
+          PDF_SIZE="${{ steps.generate.outputs.pdf_size }}"
+          
+          # PDFサイズを表示形式に変換
+          if [ -n "$PDF_SIZE" ]; then
+            PDF_SIZE_MB=$(echo "scale=1; $PDF_SIZE / 1048576" | bc -l)
+            SIZE_INFO="（PDFサイズ: ${PDF_SIZE_MB}MB）"
+          else
+            SIZE_INFO=""
+          fi
           
           curl -X POST -H 'Content-type: application/json' \
             --data "{
@@ -215,14 +257,7 @@ jobs:
                   \"type\": \"section\",
                   \"text\": {
                     \"type\": \"mrkdwn\",
-                    \"text\": \"${CURRENT_TIME} 時点での資料はこちらです。レビューをお願いします。\\n\\n⚠️ PDFサイズが大きいため、リンクでの共有となります\"
-                  }
-                },
-                {
-                  \"type\": \"section\",
-                  \"text\": {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"📋 レビューポイント:\\n• 内容の正確性\\n• 説明の分かりやすさ\\n• 時間配分\\n• スライドデザイン\"
+                    \"text\": \"最新版のスライドをお送りします。Slackのスレッドにコメントをお願いします🙏\\n\\n📎 PDFファイルのアップロードに失敗したため、リンクでの共有となります${SIZE_INFO}\"
                   }
                 },
                 {
@@ -238,6 +273,16 @@ jobs:
                       \"type\": \"button\",
                       \"text\": { \"type\": \"plain_text\", \"text\": \"📊 HTMLプレビュー\" },
                       \"url\": \"${PAGES_URL}/slides/${TARGET_DATE}.html\"
+                    },
+                    {
+                      \"type\": \"button\",
+                      \"text\": { \"type\": \"plain_text\", \"text\": \"💻 サンプルコード (デプロイ先)\" },
+                      \"url\": \"${PAGES_URL}/handson/${TARGET_DATE}/\"
+                    },
+                    {
+                      \"type\": \"button\",
+                      \"text\": { \"type\": \"plain_text\", \"text\": \"📂 ソースコード (GitHub)\" },
+                      \"url\": \"https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/tree/main/${TARGET_DATE}\"
                     }
                   ]
                 },
@@ -246,7 +291,7 @@ jobs:
                   \"elements\": [
                     {
                       \"type\": \"mrkdwn\",
-                      \"text\": \"💬 このスレッドにフィードバックをお願いします\"
+                      \"text\": \"📅 $TARGET_DATE | ⏰ $CURRENT_TIME\"
                     }
                   ]
                 }
@@ -255,11 +300,11 @@ jobs:
             $SLACK_WEBHOOK_URL
 
       - name: Send no-slide notification
-        if: steps.target.outputs.slide_exists == 'false' && github.event.inputs.force_send == 'true' && steps.period_check.outputs.period_active == 'true'
+        if: steps.setup.outputs.slide_exists == 'false' && github.event.inputs.force_send == 'true' && steps.period_check.outputs.period_active == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          TARGET_DATE="${{ steps.target.outputs.target_date }}"
+          TARGET_DATE="${{ steps.setup.outputs.target_date }}"
           PAGES_URL="https://alt9800.github.io/2025-RemoteSensingSeminar"
           
           curl -X POST -H 'Content-type: application/json' \
@@ -309,7 +354,32 @@ jobs:
           echo "2. Webhook (links only):"
           echo "   - SLACK_WEBHOOK_URL"
           echo ""
-          echo "PDF generated at: review-output/review-${{ steps.target.outputs.target_date }}.pdf"
+          echo "PDF generated at: review-output/slide-${{ steps.setup.outputs.target_date }}.pdf"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 📊 週次レビュー実行結果" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**実行時刻:** $(TZ=Asia/Tokyo date '+%Y年%m月%d日 %H:%M JST')" >> $GITHUB_STEP_SUMMARY
+          echo "**対象日付:** ${{ steps.setup.outputs.target_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "**期間チェック:** ${{ steps.period_check.outputs.period_active == 'true' && 'アクティブ' || '終了' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.period_check.outputs.period_active }}" = "true" ]; then
+            if [ "${{ steps.setup.outputs.slide_exists }}" = "true" ]; then
+              echo "✅ スライド: 存在" >> $GITHUB_STEP_SUMMARY
+              echo "📄 PDFサイズ: ${{ steps.generate.outputs.pdf_size }} bytes" >> $GITHUB_STEP_SUMMARY
+              
+              if [ "${{ steps.upload.outputs.upload_success }}" = "true" ]; then
+                echo "✅ Slackアップロード: 成功" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "⚠️ Slackアップロード: 失敗（リンク送信で代替）" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "❌ スライド: 未作成" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
 
       - name: Cleanup
         if: always()
