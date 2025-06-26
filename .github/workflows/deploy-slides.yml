@@ -23,7 +23,7 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.pages-deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -328,7 +328,7 @@ jobs:
 
       - name: Deploy to GitHub Pages
         if: steps.find-dirs.outputs.has_directories == 'true'
-        id: deployment
+        id: pages-deployment
         uses: actions/deploy-pages@v4
 
       - name: Summary
@@ -363,7 +363,7 @@ jobs:
           done
           
           echo "### 🔗 公開URL:" >> $GITHUB_STEP_SUMMARY
-          echo "**${{ steps.deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.pages-deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 統計情報:" >> $GITHUB_STEP_SUMMARY
           echo "- 総ディレクトリ数: $(echo "${{ steps.find-dirs.outputs.all_dates }}" | wc -l)" >> $GITHUB_STEP_SUMMARY
