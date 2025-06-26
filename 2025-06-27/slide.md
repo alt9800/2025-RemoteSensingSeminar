@@ -51,8 +51,10 @@ MapLibre GL JS を例に、Webフロントエンドにおけるデファクト�
 ---
 
 今回触れないこと
+npmのインストール方法 (npm -v でWSLやPowershellで起動できればOK!)
+WSL(Ubuntu)/Power shellの動かし方
 Javascriptの文法
-→必要があれば即習のような手配を行います。
+→希望や必要があれば即習のような手配を行います。
 
 ---
 
@@ -74,7 +76,7 @@ WebGLベースであることを活かして、3Dの演算も行え、Globeビ�
 
 ---
 
-## Map Libre　GL JSで作られた面白いプロダクトs
+## Map Libre　GL JSで作られた面白いプロダクト
 
 
 ---
@@ -99,8 +101,6 @@ WebGLベースであることを活かして、3Dの演算も行え、Globeビ�
 npm install maplibre-gl
 
 
-
-
 ---
 
 ## npmを使うとなにが嬉しいか
@@ -111,7 +111,7 @@ npmを用いることで一通りライブラリをPCの中にインストール
 ---
 
 
-```html:index.html
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -133,7 +133,7 @@ npmを用いることで一通りライブラリをPCの中にインストール
 
 ---
 
-```js:main.js
+```javascript
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -154,6 +154,12 @@ map.on('load', () => {
 
 ```
 
+---
+
+`import` キーワードを用いることでローカルに存在するライブラリを使うことができます。
+npmはビルド時にこのパス解決をしてくれている格好です。
+(C/C++のリンカーがこれに当たる他、Pythonであれば同じimportキーワードが存在します。)
+
 
 ---
 
@@ -161,20 +167,23 @@ map.on('load', () => {
 
 
 ```bash
-npm install --save-dev parcel
-
+npm install --save-dev vite
 ```
 
 
-```package.json
+```json
 {
     "scripts": {
-        "dev": "parcel index.html",
-        "build": "parcel build index.html"
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview" //こちらはどちらでも...
     }
 }
 ```
 
+```sh
+npm run dev
+```
 
 ---
 
@@ -189,25 +198,20 @@ npm install --save-dev parcel
 
 
 
-
-
-
-
----
-
-
-
 ## CDNから読み込む
 
 `<head>`タグの中で記述することでライブラリを読み込み読み込めます。
 
 バージョン指定
+
 ```html
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 ```
+
 一番最新のものを呼びだす
-``html
+
+```html
 <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
 ```
@@ -260,6 +264,23 @@ npm install --save-dev parcel
 </html>
 
 ```
+
+```
+
+実行するためにはHTTPの処理ができるサーバーを起動する必要があります。
+(html自体はfile:// でも見ることは可能だが、外部との通信が基本的にはできない)
+
+
+```sh
+npm install -g http-server //PC全体にhttp-serverの機能を導入
+```
+
+もしくは、VSCodeを使ってる場合は、`Live-server`でもOK。
+
+---
+
+(起動の様子 / できることの解説)
+
 
 
 ---
@@ -458,6 +479,21 @@ https://www.publickey1.jp
 
 AjaxとjQueryは避けた方がいいかも
 
+
+
+---
+
+## 外部との接続について
+
+現代のmarkupでは概ね fetchAPIが用いられます。
+thenメソッドチェーンはとっつきにくく感じると思いますが、最初はお作法として覚えてもいいかもしれません。
+
+[非同期処理の仲間たち]
+Async / Await 
+XMLHttpRequest
+Ajax
+Axios
+fetch
 
 
 ---
