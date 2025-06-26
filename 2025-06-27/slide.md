@@ -1,296 +1,912 @@
----
-marp: true
-theme: default
-header: "衛星データ解析技術研究会<br>技術セミナー（応用編）"
-footer: "第二回 2025/06/27"
-
-paginate: true
-
-style: |
-    section.title {
-        justify-content: center;
-        text-align: left;
-    }
-    .round-icon {
-      position: absolute;
-      top: 50px;
-      right: 50px;
-      width: 400px;
-      height: 400px;
-      border-radius: 20%;
-      object-fit: cover;
-      z-index: 10;
-    }
-    .tiny-text {
-    font-size: 0.6em;  /* 通常の60%サイズ */
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-      image-rendering: -webkit-optimize-contrast;
-    }
-
-
-
----
-# 衛星データ解析技術研究会<br>技術セミナー（応用編）
-## Webアプリケーションの開発技術の習得
-
-第二回 2025/06/27
-
-担当講師 : 田中聡至
-
----
-
-## 本日のテーマ
-
-## MapLibreを用いたWebGISのフロントエンド開発
-
-MapLibre GL JS を例に、Webフロントエンドにおけるデファクトスタンダードな地理空間情報処理を平易に体験することを目標とする。
-
----
-
-13:30-13:40	イントロ : 先週の振り返りや質問対応
-13:40-14:30	MapLibreを動かすまでの設定
-14:30-14:45	色々なデータが読み込めることを見てみよう
-14:45-14:50	-----(休憩)-----
-14:50-15:30	Leafletや他のライブラリとの比較をしてみよう
-15:30-16:00	(プチアイディアソン) システムを思案しよう
-
----
-
-# MapLibre GL JSとは？
-
-
-
-
----
-
-## MapLibre　GL JSを導入しよう
-
----
-
-
-
-
-二種類の読み込み方が可能です。
-
-* npm
-* CDN
-
-
----
-
-## npmを使って読み込む
-
-(Node.jsをインストールしている前提で)
-
-npm install maplibre-gl
-
-
-
-
----
-
-## npmを使うとなにが嬉しいか
-
-npmを用いることで一通りライブラリをPCの中にインストールして置けるので、インターネットがない環境でもローカルにおける開発をすることができる。
-
-
----
-
-
-```html:index.html
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>MapLibre GL JS - npm版</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { margin: 0; padding: 0; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script src="main.js"></script>
-</body>
-</html>
-
-```
-
----
-
-```js:main.js
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-const map = new maplibregl.Map({
-    container: 'map',
-    style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
-    center: [139.7670, 35.6814], // 東京駅
-    zoom: 10
-});
-
-// ナビゲーションコントロールを追加
-map.addControl(new maplibregl.NavigationControl());
-
-// 地図の読み込み完了時の処理
-map.on('load', () => {
-    console.log('地図の読み込みが完了しました');
-});
-
-```
-
-
----
-
-## 実際に実行してみましょう
-
-
-```bash
-npm install --save-dev parcel
-
-```
-
-
-```package.json
-{
-    "scripts": {
-        "dev": "parcel index.html",
-        "build": "parcel build index.html"
-    }
-}
-```
-
-
----
-
-* jsの名前はmain.jsやindex.jsが好まれます。
-* scriptディレクトリを作成し、その中にコレクションしても良いですし、htmlと同階層においてもOK。
-
-
----
-
-
-
-## CDNから読み込む
-
-`<head>`タグの中で記述することでライブラリを読み込み読み込めます。
-
-<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-
----
-
-
-## 
-
-
----
-
-# 補足記事
-
-
----
-
-
-# npmとは？　(Node Package Manage)
-JavaScriptのパッケージ管理ツールで、Node.jsのエコシステムにおいて、ライブラリのインストールや管理、共有を行うことができます。
-(他の開発者と環境を揃えることに役に立つ。)
-
-2009年にNode.jsが登場したのち、次の年にはnpmはリリースされていたようです。
-
-
----
-
-
-# CDNとは？ (Content Delivery Network)
-Webコンテンツをインターネット系で配信/利用するために用意されたネットワーク網のこと。
-ネットワーク網の中で負荷分散がされることによって、アクセスの集中などに強く、静的なコンテンツをアプリケーションサーバーでの処理を介さずに返すことができる。
-Web開発の文脈では、CDNやJSを配信することで、html内から呼び出して、適用することができる。
-
-類似技術 : Webサーバー(NGINXなど)、DNS
-
-
----
-## CDNのサービス
-
-* jsDelivr
-* CDNJS 
-* unpkg
-* Cloudflare
-* Akamai 
-* Fastly
-* Microsoft Azure / Google Cloud / AWS にもそれぞれサービスがあります。
-
-
----
-
-# Javascriptが動く仕組み
-
-Javascriptも機械語にコンパイルすることでコンピュータに解釈され動作します。
-特に、Javacriptは「ブラウザ」によってコンパイルされ処理を返すことができることが特徴です。
-Node.jsにおいてはJSをコンピュータ内が解釈できる形にして処理を返す点は他の高級言語(C、Python、Rubyなど)と同様といえます。
-コンパイラとしてV8エンジンがNode.jsやChrome(Chromium)では活用されています。(Google Apps ScriptでもV8エンジンでJavacriptを利用しているそうです。)
-
-
----
-
-## ランタイムについて
-
-Javascriptの実行環境としては最近では DenoやBunのような代替が誕生しています。
-DenoではTypeScriptがサポートされていたり、ライブラリの導入がかなり簡略化されていて、パッケージ管理が楽になっています。また、マルチスレッドであるため、並列なプログラミングを行うことができます。
-BunはそもそもZigによって処理を高速化しているのでかなりハイパフォーマンスな実行速度を誇ります。JavaScirptの実行環境としても、バンドル速度としても、既存のランタイムと差別化できていると言えるでしょう。
-
-
-
----
-
-## npmを利用してJavascriptをサーバーサイドで動かしてみよう
-
-
-
-
----
-
-## TypeScriptも動かせます
-
-
----
-
-## node_moduleとは
-
-
-
----
-
-## package.jsonとは
-
-
----
-
-## JSONとはどのような構造か
-
-
----
-
-
-使いやすい書籍
-
-
-
-ハンズオンJavaScript オライリー
-https://www.oreilly.co.jp/books/9784873119229/
-どのような感じでJavascriptが動いているか、標準ライブラリにはどのようなものがあるか(Javascriptがどのようなことができるか)といったことがサーバーサイドJSのベテランの目線でまとまっています。
-
-
-現場のプロがわかりやすく教える 位置情報エンジニア養成講座 秀和システム
-https://www.shuwasystem.co.jp/book/9784798068923.html
-MapLibreを活用したWebフロントについての詳細な解説がなされています。
-
-
-これからWebをはじめる人のHTML＆CSS、JavaScriptのきほんのきほん マイナビブックス
-https://book.mynavi.jp/ec/products/detail/id=65861
-社内に広く、マークアップから動的なWebについて伝える際にあると便利な一冊です。
+name: Deploy Seminar Materials
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '*/slide.md'
+      - '*/handson/**'
+      - '*/assets/**'
+      - '.github/workflows/deploy-seminar-materials.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.pages-deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Japanese fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
+          fc-cache -fv
+
+      - name: Install Marp CLI
+        run: |
+          npm install -g @marp-team/marp-cli
+          echo "Marp version:"
+          marp --version
+
+      - name: Find all seminar directories
+        id: find-dirs
+        run: |
+          ALL_DATES=$(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort)
+          
+          echo "Found directories:"
+          echo "$ALL_DATES"
+          
+          if [ -n "$ALL_DATES" ]; then
+            echo "has_directories=true" >> $GITHUB_OUTPUT
+            echo "all_dates<<EOF" >> $GITHUB_OUTPUT
+            echo "$ALL_DATES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "has_directories=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create docs directories
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          rm -rf docs
+          mkdir -p docs/slides
+          mkdir -p docs/handson
+
+      - name: Generate materials for all seminars
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          echo "${{ steps.find-dirs.outputs.all_dates }}" | while read DATE_DIR; do
+            if [ -n "$DATE_DIR" ] && [ -d "$DATE_DIR" ]; then
+              echo "=========================================="
+              echo "Processing $DATE_DIR..."
+              echo "=========================================="
+              
+              if [ -f "$DATE_DIR/slide.md" ]; then
+                echo "📊 Generating slides for $DATE_DIR"
+                
+                echo "  📁 Directory contents:"
+                ls -la "$DATE_DIR/" | grep -E '\.(md|markdown)
+                
+                mkdir -p "docs/slides/$DATE_DIR"
+                
+                if [ -d "$DATE_DIR/assets" ]; then
+                  echo "  📁 Copying assets directory"
+                  cp -r "$DATE_DIR/assets" "docs/slides/$DATE_DIR/"
+                fi
+                
+                find "$DATE_DIR" -maxdepth 1 \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) | while read img_file; do
+                  if [ -f "$img_file" ]; then
+                    echo "  🖼️ Copying image: $(basename "$img_file")"
+                    cp "$img_file" "docs/slides/$DATE_DIR/"
+                  fi
+                done
+                
+                echo "  📄 Generating HTML..."
+                marp "$(pwd)/$DATE_DIR/slide.md" \
+                  --html \
+                  --allow-local-files \
+                  --output "$(pwd)/docs/slides/$DATE_DIR.html"
+                
+                echo "  📑 Generating PDF..."
+                marp "$(pwd)/$DATE_DIR/slide.md" \
+                  --pdf \
+                  --allow-local-files \
+                  --output "$(pwd)/docs/slides/$DATE_DIR.pdf"
+                
+                echo "  🔧 Adjusting image paths in HTML..."
+                sed -i "s|src=\"\([^\"]*\)\"|src=\"$DATE_DIR/\1\"|g" "docs/slides/$DATE_DIR.html"
+                sed -i "s|src=\"assets/|src=\"$DATE_DIR/assets/|g" "docs/slides/$DATE_DIR.html"
+                
+                echo "  ✅ Slides generated successfully for $DATE_DIR"
+              else
+                echo "  ⚠️ slide.md not found in $DATE_DIR"
+              fi
+              
+              if [ -d "$DATE_DIR/handson" ]; then
+                echo "  💻 Copying handson materials..."
+                cp -r "$DATE_DIR/handson" "docs/handson/$DATE_DIR"
+                echo "  ✅ Handson materials copied for $DATE_DIR"
+              else
+                echo "  ℹ️ No handson directory in $DATE_DIR"
+              fi
+              
+              echo ""
+            fi
+          done
+
+      - name: Generate site index
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          cat > docs/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>📚 セミナー資料</title>
+              <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+              <style>
+                  body { 
+                      max-width: 980px; 
+                      margin: 0 auto; 
+                      padding: 45px; 
+                      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Noto Sans, Helvetica, Arial, sans-serif;
+                      background-color: #f6f8fa;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 12px;
+                      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+                      padding: 40px;
+                  }
+                  .header {
+                      text-align: center;
+                      margin-bottom: 40px;
+                      padding-bottom: 20px;
+                      border-bottom: 2px solid #e1e4e8;
+                  }
+                  .header h1 {
+                      font-size: 2.5em;
+                      margin-bottom: 10px;
+                  }
+                  .session { 
+                      margin: 20px 0; 
+                      padding: 25px; 
+                      border: 1px solid #e1e4e8; 
+                      border-radius: 8px;
+                      background: #fafbfc;
+                      transition: transform 0.2s, box-shadow 0.2s;
+                  }
+                  .session:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                      background: #f8f9fa;
+                  }
+                  .session h2 {
+                      margin-top: 0;
+                      color: #24292e;
+                      font-size: 1.5em;
+                  }
+                  .links { 
+                      display: flex; 
+                      gap: 15px; 
+                      margin-top: 15px; 
+                      flex-wrap: wrap; 
+                  }
+                  .links a { 
+                      padding: 10px 20px; 
+                      background: #0366d6; 
+                      color: white; 
+                      text-decoration: none; 
+                      border-radius: 6px; 
+                      font-size: 14px;
+                      font-weight: 500;
+                      transition: all 0.2s;
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                  }
+                  .links a:hover { 
+                      background: #0256cc; 
+                      transform: translateY(-1px);
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                  }
+                  .links a.pdf {
+                      background: #d73a49;
+                  }
+                  .links a.pdf:hover {
+                      background: #cb2431;
+                  }
+                  .links a.handson {
+                      background: #28a745;
+                  }
+                  .links a.handson:hover {
+                      background: #218838;
+                  }
+                  .update-time {
+                      text-align: center;
+                      color: #6a737d;
+                      font-size: 14px;
+                      margin-bottom: 30px;
+                  }
+                  .footer {
+                      text-align: center;
+                      margin-top: 50px;
+                      padding-top: 30px;
+                      border-top: 1px solid #e1e4e8;
+                      color: #6a737d;
+                      font-size: 14px;
+                  }
+                  .no-materials {
+                      color: #6a737d;
+                      font-style: italic;
+                      margin-top: 10px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>📚 セミナー資料</h1>
+                      <div class="update-time">最終更新: 
+          HTMLEOF
+          
+          date '+%Y年%m月%d日 %H:%M (JST)' >> docs/index.html
+          
+          cat >> docs/index.html << 'HTMLEOF'
+                      </div>
+                  </div>
+          HTMLEOF
+          
+          find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r | while read dir; do
+            DATE_DIR=$(basename "$dir")
+            
+            HAS_SLIDE_HTML=false
+            HAS_SLIDE_PDF=false
+            HAS_HANDSON=false
+            
+            [ -f "docs/slides/$DATE_DIR.html" ] && HAS_SLIDE_HTML=true
+            [ -f "docs/slides/$DATE_DIR.pdf" ] && HAS_SLIDE_PDF=true
+            [ -d "docs/handson/$DATE_DIR" ] && HAS_HANDSON=true
+            
+            if [ "$HAS_SLIDE_HTML" = true ] || [ "$HAS_SLIDE_PDF" = true ] || [ "$HAS_HANDSON" = true ]; then
+              echo "        <div class=\"session\">" >> docs/index.html
+              echo "            <h2>📅 $DATE_DIR</h2>" >> docs/index.html
+              echo "            <div class=\"links\">" >> docs/index.html
+              
+              if [ "$HAS_SLIDE_HTML" = true ]; then
+                echo "                <a href=\"slides/$DATE_DIR.html\">📊 スライド (HTML)</a>" >> docs/index.html
+              fi
+              if [ "$HAS_SLIDE_PDF" = true ]; then
+                echo "                <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> docs/index.html
+              fi
+              
+              if [ "$HAS_HANDSON" = true ]; then
+                echo "                <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> docs/index.html
+              fi
+              
+              echo "            </div>" >> docs/index.html
+              echo "        </div>" >> docs/index.html
+            fi
+          done
+          
+          cat >> docs/index.html << 'HTMLEOF'
+                  
+                  <div class="footer">
+                      <p>🤖 このページは GitHub Actions により自動生成されています</p>
+                      <p><a href="https://github.com/${{ github.repository }}" style="color: #0366d6;">View on GitHub</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          HTMLEOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        id: pages-deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Summary
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          echo "## 🎉 デプロイ完了!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 処理結果:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "${{ steps.find-dirs.outputs.all_dates }}" | while read DATE_DIR; do
+            if [ -n "$DATE_DIR" ] && [ -d "$DATE_DIR" ]; then
+              echo "#### 📅 $DATE_DIR" >> $GITHUB_STEP_SUMMARY
+              
+              if [ -f "docs/slides/$DATE_DIR.html" ]; then
+                echo "- ✅ スライド (HTML) 生成完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -f "docs/slides/$DATE_DIR.pdf" ]; then
+                echo "- ✅ スライド (PDF) 生成完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -d "docs/handson/$DATE_DIR" ]; then
+                echo "- ✅ ハンズオン資料 コピー完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              if [ ! -f "$DATE_DIR/slide.md" ] && [ ! -d "$DATE_DIR/handson" ]; then
+                echo "- ⚠️ 資料が見つかりませんでした" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "### 🔗 公開URL:" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.pages-deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 統計情報:" >> $GITHUB_STEP_SUMMARY
+          echo "- 総ディレクトリ数: $(echo "${{ steps.find-dirs.outputs.all_dates }}" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- HTML生成数: $(find docs/slides -name "*.html" 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- PDF生成数: $(find docs/slides -name "*.pdf" 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- ハンズオン数: $(find docs/handson -maxdepth 1 -type d 2>/dev/null | grep -E '[0-9]{4}-[0-9]{2}-[0-9]{2}' | wc -l)" >> $GITHUB_STEP_SUMMARY
+
+      - name: No directories found
+        if: steps.find-dirs.outputs.has_directories == 'false'
+        run: |
+          echo "## ⚠️ セミナーディレクトリが見つかりません" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "日付形式（YYYY-MM-DD）のディレクトリが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY || echo "    (No other markdown files)"
+                echo "  📁 Root directory markdown files:"
+                ls -la . | grep -E '\.(md|markdown)
+                
+                mkdir -p "docs/slides/$DATE_DIR"
+                
+                if [ -d "$DATE_DIR/assets" ]; then
+                  echo "  📁 Copying assets directory"
+                  cp -r "$DATE_DIR/assets" "docs/slides/$DATE_DIR/"
+                fi
+                
+                find "$DATE_DIR" -maxdepth 1 \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) | while read img_file; do
+                  if [ -f "$img_file" ]; then
+                    echo "  🖼️ Copying image: $(basename "$img_file")"
+                    cp "$img_file" "docs/slides/$DATE_DIR/"
+                  fi
+                done
+                
+                echo "  📄 Generating HTML..."
+                marp "$(pwd)/$DATE_DIR/slide.md" \
+                  --html \
+                  --allow-local-files \
+                  --output "$(pwd)/docs/slides/$DATE_DIR.html"
+                
+                echo "  📑 Generating PDF..."
+                marp "$(pwd)/$DATE_DIR/slide.md" \
+                  --pdf \
+                  --allow-local-files \
+                  --output "$(pwd)/docs/slides/$DATE_DIR.pdf"
+                
+                echo "  🔧 Adjusting image paths in HTML..."
+                sed -i "s|src=\"\([^\"]*\)\"|src=\"$DATE_DIR/\1\"|g" "docs/slides/$DATE_DIR.html"
+                sed -i "s|src=\"assets/|src=\"$DATE_DIR/assets/|g" "docs/slides/$DATE_DIR.html"
+                
+                echo "  ✅ Slides generated successfully for $DATE_DIR"
+              else
+                echo "  ⚠️ slide.md not found in $DATE_DIR"
+              fi
+              
+              if [ -d "$DATE_DIR/handson" ]; then
+                echo "  💻 Copying handson materials..."
+                cp -r "$DATE_DIR/handson" "docs/handson/$DATE_DIR"
+                echo "  ✅ Handson materials copied for $DATE_DIR"
+              else
+                echo "  ℹ️ No handson directory in $DATE_DIR"
+              fi
+              
+              echo ""
+            fi
+          done
+
+      - name: Generate site index
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          cat > docs/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>📚 セミナー資料</title>
+              <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+              <style>
+                  body { 
+                      max-width: 980px; 
+                      margin: 0 auto; 
+                      padding: 45px; 
+                      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Noto Sans, Helvetica, Arial, sans-serif;
+                      background-color: #f6f8fa;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 12px;
+                      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+                      padding: 40px;
+                  }
+                  .header {
+                      text-align: center;
+                      margin-bottom: 40px;
+                      padding-bottom: 20px;
+                      border-bottom: 2px solid #e1e4e8;
+                  }
+                  .header h1 {
+                      font-size: 2.5em;
+                      margin-bottom: 10px;
+                  }
+                  .session { 
+                      margin: 20px 0; 
+                      padding: 25px; 
+                      border: 1px solid #e1e4e8; 
+                      border-radius: 8px;
+                      background: #fafbfc;
+                      transition: transform 0.2s, box-shadow 0.2s;
+                  }
+                  .session:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                      background: #f8f9fa;
+                  }
+                  .session h2 {
+                      margin-top: 0;
+                      color: #24292e;
+                      font-size: 1.5em;
+                  }
+                  .links { 
+                      display: flex; 
+                      gap: 15px; 
+                      margin-top: 15px; 
+                      flex-wrap: wrap; 
+                  }
+                  .links a { 
+                      padding: 10px 20px; 
+                      background: #0366d6; 
+                      color: white; 
+                      text-decoration: none; 
+                      border-radius: 6px; 
+                      font-size: 14px;
+                      font-weight: 500;
+                      transition: all 0.2s;
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                  }
+                  .links a:hover { 
+                      background: #0256cc; 
+                      transform: translateY(-1px);
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                  }
+                  .links a.pdf {
+                      background: #d73a49;
+                  }
+                  .links a.pdf:hover {
+                      background: #cb2431;
+                  }
+                  .links a.handson {
+                      background: #28a745;
+                  }
+                  .links a.handson:hover {
+                      background: #218838;
+                  }
+                  .update-time {
+                      text-align: center;
+                      color: #6a737d;
+                      font-size: 14px;
+                      margin-bottom: 30px;
+                  }
+                  .footer {
+                      text-align: center;
+                      margin-top: 50px;
+                      padding-top: 30px;
+                      border-top: 1px solid #e1e4e8;
+                      color: #6a737d;
+                      font-size: 14px;
+                  }
+                  .no-materials {
+                      color: #6a737d;
+                      font-style: italic;
+                      margin-top: 10px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>📚 セミナー資料</h1>
+                      <div class="update-time">最終更新: 
+          HTMLEOF
+          
+          date '+%Y年%m月%d日 %H:%M (JST)' >> docs/index.html
+          
+          cat >> docs/index.html << 'HTMLEOF'
+                      </div>
+                  </div>
+          HTMLEOF
+          
+          find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r | while read dir; do
+            DATE_DIR=$(basename "$dir")
+            
+            HAS_SLIDE_HTML=false
+            HAS_SLIDE_PDF=false
+            HAS_HANDSON=false
+            
+            [ -f "docs/slides/$DATE_DIR.html" ] && HAS_SLIDE_HTML=true
+            [ -f "docs/slides/$DATE_DIR.pdf" ] && HAS_SLIDE_PDF=true
+            [ -d "docs/handson/$DATE_DIR" ] && HAS_HANDSON=true
+            
+            if [ "$HAS_SLIDE_HTML" = true ] || [ "$HAS_SLIDE_PDF" = true ] || [ "$HAS_HANDSON" = true ]; then
+              echo "        <div class=\"session\">" >> docs/index.html
+              echo "            <h2>📅 $DATE_DIR</h2>" >> docs/index.html
+              echo "            <div class=\"links\">" >> docs/index.html
+              
+              if [ "$HAS_SLIDE_HTML" = true ]; then
+                echo "                <a href=\"slides/$DATE_DIR.html\">📊 スライド (HTML)</a>" >> docs/index.html
+              fi
+              if [ "$HAS_SLIDE_PDF" = true ]; then
+                echo "                <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> docs/index.html
+              fi
+              
+              if [ "$HAS_HANDSON" = true ]; then
+                echo "                <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> docs/index.html
+              fi
+              
+              echo "            </div>" >> docs/index.html
+              echo "        </div>" >> docs/index.html
+            fi
+          done
+          
+          cat >> docs/index.html << 'HTMLEOF'
+                  
+                  <div class="footer">
+                      <p>🤖 このページは GitHub Actions により自動生成されています</p>
+                      <p><a href="https://github.com/${{ github.repository }}" style="color: #0366d6;">View on GitHub</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          HTMLEOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        id: pages-deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Summary
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          echo "## 🎉 デプロイ完了!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 処理結果:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "${{ steps.find-dirs.outputs.all_dates }}" | while read DATE_DIR; do
+            if [ -n "$DATE_DIR" ] && [ -d "$DATE_DIR" ]; then
+              echo "#### 📅 $DATE_DIR" >> $GITHUB_STEP_SUMMARY
+              
+              if [ -f "docs/slides/$DATE_DIR.html" ]; then
+                echo "- ✅ スライド (HTML) 生成完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -f "docs/slides/$DATE_DIR.pdf" ]; then
+                echo "- ✅ スライド (PDF) 生成完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -d "docs/handson/$DATE_DIR" ]; then
+                echo "- ✅ ハンズオン資料 コピー完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              if [ ! -f "$DATE_DIR/slide.md" ] && [ ! -d "$DATE_DIR/handson" ]; then
+                echo "- ⚠️ 資料が見つかりませんでした" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "### 🔗 公開URL:" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.pages-deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 統計情報:" >> $GITHUB_STEP_SUMMARY
+          echo "- 総ディレクトリ数: $(echo "${{ steps.find-dirs.outputs.all_dates }}" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- HTML生成数: $(find docs/slides -name "*.html" 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- PDF生成数: $(find docs/slides -name "*.pdf" 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- ハンズオン数: $(find docs/handson -maxdepth 1 -type d 2>/dev/null | grep -E '[0-9]{4}-[0-9]{2}-[0-9]{2}' | wc -l)" >> $GITHUB_STEP_SUMMARY
+
+      - name: No directories found
+        if: steps.find-dirs.outputs.has_directories == 'false'
+        run: |
+          echo "## ⚠️ セミナーディレクトリが見つかりません" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "日付形式（YYYY-MM-DD）のディレクトリが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY || echo "    (No markdown files in root)"
+                echo "  🔍 Current working directory: $(pwd)"
+                
+                mkdir -p "docs/slides/$DATE_DIR"
+                
+                if [ -d "$DATE_DIR/assets" ]; then
+                  echo "  📁 Copying assets directory"
+                  cp -r "$DATE_DIR/assets" "docs/slides/$DATE_DIR/"
+                fi
+                
+                find "$DATE_DIR" -maxdepth 1 \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) | while read img_file; do
+                  if [ -f "$img_file" ]; then
+                    echo "  🖼️ Copying image: $(basename "$img_file")"
+                    cp "$img_file" "docs/slides/$DATE_DIR/"
+                  fi
+                done
+                
+                echo "  📄 Generating HTML..."
+                marp "$(pwd)/$DATE_DIR/slide.md" \
+                  --html \
+                  --allow-local-files \
+                  --output "$(pwd)/docs/slides/$DATE_DIR.html"
+                
+                echo "  📑 Generating PDF..."
+                marp "$(pwd)/$DATE_DIR/slide.md" \
+                  --pdf \
+                  --allow-local-files \
+                  --output "$(pwd)/docs/slides/$DATE_DIR.pdf"
+                
+                echo "  🔧 Adjusting image paths in HTML..."
+                sed -i "s|src=\"\([^\"]*\)\"|src=\"$DATE_DIR/\1\"|g" "docs/slides/$DATE_DIR.html"
+                sed -i "s|src=\"assets/|src=\"$DATE_DIR/assets/|g" "docs/slides/$DATE_DIR.html"
+                
+                echo "  ✅ Slides generated successfully for $DATE_DIR"
+              else
+                echo "  ⚠️ slide.md not found in $DATE_DIR"
+              fi
+              
+              if [ -d "$DATE_DIR/handson" ]; then
+                echo "  💻 Copying handson materials..."
+                cp -r "$DATE_DIR/handson" "docs/handson/$DATE_DIR"
+                echo "  ✅ Handson materials copied for $DATE_DIR"
+              else
+                echo "  ℹ️ No handson directory in $DATE_DIR"
+              fi
+              
+              echo ""
+            fi
+          done
+
+      - name: Generate site index
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          cat > docs/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>📚 セミナー資料</title>
+              <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+              <style>
+                  body { 
+                      max-width: 980px; 
+                      margin: 0 auto; 
+                      padding: 45px; 
+                      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Noto Sans, Helvetica, Arial, sans-serif;
+                      background-color: #f6f8fa;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 12px;
+                      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+                      padding: 40px;
+                  }
+                  .header {
+                      text-align: center;
+                      margin-bottom: 40px;
+                      padding-bottom: 20px;
+                      border-bottom: 2px solid #e1e4e8;
+                  }
+                  .header h1 {
+                      font-size: 2.5em;
+                      margin-bottom: 10px;
+                  }
+                  .session { 
+                      margin: 20px 0; 
+                      padding: 25px; 
+                      border: 1px solid #e1e4e8; 
+                      border-radius: 8px;
+                      background: #fafbfc;
+                      transition: transform 0.2s, box-shadow 0.2s;
+                  }
+                  .session:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                      background: #f8f9fa;
+                  }
+                  .session h2 {
+                      margin-top: 0;
+                      color: #24292e;
+                      font-size: 1.5em;
+                  }
+                  .links { 
+                      display: flex; 
+                      gap: 15px; 
+                      margin-top: 15px; 
+                      flex-wrap: wrap; 
+                  }
+                  .links a { 
+                      padding: 10px 20px; 
+                      background: #0366d6; 
+                      color: white; 
+                      text-decoration: none; 
+                      border-radius: 6px; 
+                      font-size: 14px;
+                      font-weight: 500;
+                      transition: all 0.2s;
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                  }
+                  .links a:hover { 
+                      background: #0256cc; 
+                      transform: translateY(-1px);
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                  }
+                  .links a.pdf {
+                      background: #d73a49;
+                  }
+                  .links a.pdf:hover {
+                      background: #cb2431;
+                  }
+                  .links a.handson {
+                      background: #28a745;
+                  }
+                  .links a.handson:hover {
+                      background: #218838;
+                  }
+                  .update-time {
+                      text-align: center;
+                      color: #6a737d;
+                      font-size: 14px;
+                      margin-bottom: 30px;
+                  }
+                  .footer {
+                      text-align: center;
+                      margin-top: 50px;
+                      padding-top: 30px;
+                      border-top: 1px solid #e1e4e8;
+                      color: #6a737d;
+                      font-size: 14px;
+                  }
+                  .no-materials {
+                      color: #6a737d;
+                      font-style: italic;
+                      margin-top: 10px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>📚 セミナー資料</h1>
+                      <div class="update-time">最終更新: 
+          HTMLEOF
+          
+          date '+%Y年%m月%d日 %H:%M (JST)' >> docs/index.html
+          
+          cat >> docs/index.html << 'HTMLEOF'
+                      </div>
+                  </div>
+          HTMLEOF
+          
+          find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r | while read dir; do
+            DATE_DIR=$(basename "$dir")
+            
+            HAS_SLIDE_HTML=false
+            HAS_SLIDE_PDF=false
+            HAS_HANDSON=false
+            
+            [ -f "docs/slides/$DATE_DIR.html" ] && HAS_SLIDE_HTML=true
+            [ -f "docs/slides/$DATE_DIR.pdf" ] && HAS_SLIDE_PDF=true
+            [ -d "docs/handson/$DATE_DIR" ] && HAS_HANDSON=true
+            
+            if [ "$HAS_SLIDE_HTML" = true ] || [ "$HAS_SLIDE_PDF" = true ] || [ "$HAS_HANDSON" = true ]; then
+              echo "        <div class=\"session\">" >> docs/index.html
+              echo "            <h2>📅 $DATE_DIR</h2>" >> docs/index.html
+              echo "            <div class=\"links\">" >> docs/index.html
+              
+              if [ "$HAS_SLIDE_HTML" = true ]; then
+                echo "                <a href=\"slides/$DATE_DIR.html\">📊 スライド (HTML)</a>" >> docs/index.html
+              fi
+              if [ "$HAS_SLIDE_PDF" = true ]; then
+                echo "                <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> docs/index.html
+              fi
+              
+              if [ "$HAS_HANDSON" = true ]; then
+                echo "                <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> docs/index.html
+              fi
+              
+              echo "            </div>" >> docs/index.html
+              echo "        </div>" >> docs/index.html
+            fi
+          done
+          
+          cat >> docs/index.html << 'HTMLEOF'
+                  
+                  <div class="footer">
+                      <p>🤖 このページは GitHub Actions により自動生成されています</p>
+                      <p><a href="https://github.com/${{ github.repository }}" style="color: #0366d6;">View on GitHub</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          HTMLEOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        id: pages-deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Summary
+        if: steps.find-dirs.outputs.has_directories == 'true'
+        run: |
+          echo "## 🎉 デプロイ完了!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 処理結果:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "${{ steps.find-dirs.outputs.all_dates }}" | while read DATE_DIR; do
+            if [ -n "$DATE_DIR" ] && [ -d "$DATE_DIR" ]; then
+              echo "#### 📅 $DATE_DIR" >> $GITHUB_STEP_SUMMARY
+              
+              if [ -f "docs/slides/$DATE_DIR.html" ]; then
+                echo "- ✅ スライド (HTML) 生成完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -f "docs/slides/$DATE_DIR.pdf" ]; then
+                echo "- ✅ スライド (PDF) 生成完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              if [ -d "docs/handson/$DATE_DIR" ]; then
+                echo "- ✅ ハンズオン資料 コピー完了" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              if [ ! -f "$DATE_DIR/slide.md" ] && [ ! -d "$DATE_DIR/handson" ]; then
+                echo "- ⚠️ 資料が見つかりませんでした" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "### 🔗 公開URL:" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.pages-deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 統計情報:" >> $GITHUB_STEP_SUMMARY
+          echo "- 総ディレクトリ数: $(echo "${{ steps.find-dirs.outputs.all_dates }}" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- HTML生成数: $(find docs/slides -name "*.html" 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- PDF生成数: $(find docs/slides -name "*.pdf" 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- ハンズオン数: $(find docs/handson -maxdepth 1 -type d 2>/dev/null | grep -E '[0-9]{4}-[0-9]{2}-[0-9]{2}' | wc -l)" >> $GITHUB_STEP_SUMMARY
+
+      - name: No directories found
+        if: steps.find-dirs.outputs.has_directories == 'false'
+        run: |
+          echo "## ⚠️ セミナーディレクトリが見つかりません" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "日付形式（YYYY-MM-DD）のディレクトリが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY
