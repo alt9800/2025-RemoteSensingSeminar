@@ -148,6 +148,14 @@ jobs:
       - name: Generate site index
         if: steps.find-dirs.outputs.has_directories == 'true'
         run: |
+          echo "🔍 Current directory: $(pwd)"
+          echo "📁 Directory contents:"
+          ls -la
+          echo "📄 docs directory:"
+          ls -la docs/ || echo "docs directory not found"
+          
+          echo "📝 Generating index.html..."
+          
           cat > docs/index.html << 'HTMLEOF'
           <!DOCTYPE html>
           <html lang="ja">
@@ -242,15 +250,21 @@ jobs:
                   <h1>📚 セミナー資料</h1>
                   <div class="update-time">最終更新: 
           HTMLEOF
+          
           date '+%Y年%m月%d日 %H:%M (JST)' >> docs/index.html
+          
           cat >> docs/index.html << 'HTMLEOF'
           </div>
               </div>
           HTMLEOF
           
+          echo "📝 Generated header, now processing directories..."
+          
           # 全ての日付ディレクトリをスキャンして一覧作成（新しい順）
           find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r | while read dir; do
             DATE_DIR=$(basename "$dir")
+            
+            echo "Processing directory: $DATE_DIR"
             
             # 今回更新されたかチェック
             IS_UPDATED=""
@@ -259,7 +273,7 @@ jobs:
             fi
             
             echo "    <div class=\"session $IS_UPDATED\">" >> docs/index.html
-            echo "        <h2>📅 $DATE_DIR $([ -n "$IS_UPDATED" ] && echo '🆕')</h2>" >> docs/index.html
+            echo "        <h2>📅 $DATE_DIR 🆕</h2>" >> docs/index.html
             echo "        <div class=\"links\">" >> docs/index.html
             
             # スライドリンク（ファイルが存在する場合のみ）
@@ -276,12 +290,7 @@ jobs:
             fi
             
             echo "        </div>" >> docs/index.html
-            
-            # 更新ステータス表示
-            if [ -n "$IS_UPDATED" ]; then
-              echo "        <div class=\"status\">✨ 今回更新されました</div>" >> docs/index.html
-            fi
-            
+            echo "        <div class=\"status\">✨ 処理完了</div>" >> docs/index.html
             echo "    </div>" >> docs/index.html
           done
           
@@ -293,6 +302,10 @@ jobs:
           </body>
           </html>
           HTMLEOF
+          
+          echo "✅ Index generation completed"
+          echo "📄 Final docs directory:"
+          ls -la docs/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
