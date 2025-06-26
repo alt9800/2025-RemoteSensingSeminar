@@ -226,6 +226,7 @@ Web開発の文脈では、CDNやJSを配信することで、html内から呼�
 * Microsoft Azure / Google Cloud / AWS にもそれぞれサービスがあります。
 
 
+---
 
 # Javascriptが動く仕組み
 
