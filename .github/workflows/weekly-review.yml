@@ -1,7 +1,7 @@
 name: Weekly Slide Review
 on:
   schedule:
-    - cron: '0 3 * * 4' # 毎週木曜日 12:00 JST
+    - cron: '0 16 * * 4' # 毎週木曜日 16:00 JST
   workflow_dispatch:
     inputs:
       target_date:
