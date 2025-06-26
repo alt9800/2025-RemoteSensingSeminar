@@ -68,10 +68,21 @@ Javascriptの文法
 ---
 
 # MapLibre GL JSとは？
+https://maplibre.org
+
 
 Mapbox社が開発しているMapbox GL JSが開発していく中で、Mapboxのシステムを利用するOSS開発体制となったため、オープンプラットフォームで利用しやすく、かつ独立して開発できる体制を保つためにフォークして開発が始まったらWebGLベースの地図表示ライブラリです。
 
 WebGLベースであることを活かして、3Dの演算も行え、Globeビューなども提供しています。
+
+
+---
+
+ドキュメント
+https://maplibre.org/maplibre-gl-js/docs/
+
+日本語版
+https://unopengis.github.io/learning/ja/intro
 
 
 ---
@@ -285,6 +296,68 @@ npm install -g http-server //PC全体にhttp-serverの機能を導入
 
 ---
 
+## ユーザーインタラクション (地図に重ねるボタン)について
+
+地図を読み込んだ後に、mapインスタンスに対して、addControlメソッドでボタンを配置することができる
+```javascript
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+map.addControl(new maplibregl.FullscreenControl(), 'top-left');
+map.addControl(new maplibregl.GeolocateControl(), 'bottom-right');
+```
+
+(このGISの要件に足る組み込みメソッドの充実さこそが一つのMapLibreの価値だと思います。)
+
+---
+
+### 別冊付録参照
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/3-userInteractions/
+
+
+
+---
+
+
+背景地図について
+
+
+
+---
+
+グローブビューについて
+
+---
+
+MapLibre にデータを読み込んでみよう！
+
+
+---
+
+json
+
+直書き
+
+
+csvを読み込む
+
+csvで読み込んだものを表にしたい
+
+---
+
+
+## MapLibreの利用についてのルール
+
+
+
+---
+
+
+距離と測地系について
+
+---
+
+
+
 # 補足記事
 
 
@@ -346,6 +419,9 @@ BunはそもそもZigによって処理を高速化しているのでかなり�
 
 ## npmを利用してJavascriptをサーバーサイドで動かしてみよう
 
+おまけを参照
+
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/0-node-lessons/
 
 
 
@@ -353,6 +429,43 @@ BunはそもそもZigによって処理を高速化しているのでかなり�
 
 ## TypeScriptも動かせます
 
+```sh
+node --experimental-strip-types app.ts
+```
+
+---
+
+TSのサンプルコード
+```typescript
+// demo.ts 
+interface User {
+  name: string;
+  age: number;
+}
+
+// 型安全性 - 間違った型を渡すとエラーになる
+function greet(user: User): string {
+  return `こんにちは、${user.name}さん（${user.age}歳）！`;
+}
+
+// 自動補完とタイプセーフティ
+const users: User[] = [
+  { name: "田中", age: 25 },
+  { name: "佐藤", age: 30 }
+];
+
+// 型推論 - TypeScriptが自動で型を判定
+const messages = users.map(user => greet(user));
+
+console.log("=== TypeScriptの良さデモ ===");
+messages.forEach(msg => console.log(msg));
+
+```
+
+
+---
+
+実践的には学習は`tsc`で始めて、プロダクト環境はviteを用いて開発するとよいかもしれません。
 
 ---
 
@@ -465,12 +578,34 @@ https://book.mynavi.jp/ec/products/detail/id=65861
 
 ---
 
+Web知識全般
+
+https://gihyo.jp/magazine/SD
+
+
+https://gihyo.jp/magazine/SD/archive/2023/202308
+上記の号から位置情報エンジニアリングのすすめの連載が始まり、現在ではMIERUNE社のブログとして公開されています。
+https://zenn.dev/mierune_inc/books/location-engineering
+
+[Web Designing 2022年12月号 | Web Designing Web](https://webdesigning.book.mynavi.jp/article/315/)
+フロントエンドは今時どうすべきかが学べます。
+これに関しては記事として公式に転載されています。
+https://webdesigning.book.mynavi.jp/article/4876/
+
+
+(この辺りは呼んでくだされば各社個別で講習も行います。)
+
+
+---
+
 Javascriptに関する情報を集めるには
 
 https://ics.media
 
 web技術全般
 https://www.publickey1.jp
+
+
 
 
 ---
@@ -511,6 +646,15 @@ fetch
 帝国書院さんのジオグラフ (2021)がにわかに盛り上がっている
 https://www.geograph.teikokushoin.co.jp
 
+
+
+---
+
+
+## その他のニュース
+
+彗星の如く現れたGemini CLI
+https://cloud.google.com/blog/ja/topics/developers-practitioners/introducing-gemini-cli/
 
 
 ---

@@ -1,9 +1,15 @@
 内包されるファイルの説明
 
 
-[1-usenpm](./1-usenpm/)
-npmを利用してバンドルするページ(webページではビルドしないと動かない)
+[1-npmを利用してバンドルするページ](./1-usenpm/)
+(webページではビルドしないと動かない)
 
 
-[2-useCDN](./2-useCDN/)
-CDNを使ってmaplibreを動かす
+[2-CDNを使ってmaplibreを動かす](./2-useCDN/)
+
+
+
+[3-地図に重ねるボタン](./3-userInteractions/)
+
+
+[0-おまけ](./0-node-lessons/)f
