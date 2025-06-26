@@ -101,16 +101,40 @@ jobs:
                 done
                 
                 echo "  📄 Generating HTML..."
-                marp "$(pwd)/$DATE_DIR/slide.md" \
+                # 一時ディレクトリで作業
+                TEMP_DIR=$(mktemp -d)
+                cp "$DATE_DIR/slide.md" "$TEMP_DIR/slide.md"
+                if [ -d "$DATE_DIR/assets" ]; then
+                  cp -r "$DATE_DIR/assets" "$TEMP_DIR/assets"
+                fi
+                
+                cd "$TEMP_DIR"
+                marp slide.md \
                   --html \
                   --allow-local-files \
-                  --output "$(pwd)/docs/slides/$DATE_DIR.html"
+                  --output slide.html
+                cd - > /dev/null
+                
+                mv "$TEMP_DIR/slide.html" "docs/slides/$DATE_DIR.html"
+                rm -rf "$TEMP_DIR"
                 
                 echo "  📑 Generating PDF..."
-                marp "$(pwd)/$DATE_DIR/slide.md" \
+                # PDFも同様に
+                TEMP_DIR=$(mktemp -d)
+                cp "$DATE_DIR/slide.md" "$TEMP_DIR/slide.md"
+                if [ -d "$DATE_DIR/assets" ]; then
+                  cp -r "$DATE_DIR/assets" "$TEMP_DIR/assets"
+                fi
+                
+                cd "$TEMP_DIR"
+                marp slide.md \
                   --pdf \
                   --allow-local-files \
-                  --output "$(pwd)/docs/slides/$DATE_DIR.pdf"
+                  --output slide.pdf
+                cd - > /dev/null
+                
+                mv "$TEMP_DIR/slide.pdf" "docs/slides/$DATE_DIR.pdf"
+                rm -rf "$TEMP_DIR"
                 
                 echo "  🔧 Adjusting image paths in HTML..."
                 sed -i "s|src=\"\([^\"]*\)\"|src=\"$DATE_DIR/\1\"|g" "docs/slides/$DATE_DIR.html"
