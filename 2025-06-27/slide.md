@@ -84,8 +84,6 @@ WebGLベースであることを活かして、3Dの演算も行え、Globeビ�
 ---
 
 
-
-
 二種類の読み込み方が可能です。
 
 * npm
@@ -183,7 +181,7 @@ npm install --save-dev parcel
 * jsの名前はmain.jsやindex.jsが好まれます。
 * scriptディレクトリを作成し、その中にコレクションしても良いですし、htmlと同階層においてもOK。
 
-他には parcel や webpackによるバンドルが行われてきました。。
+他には parcel や webpackによるバンドルが行われてきました。
 
 
 
@@ -340,8 +338,28 @@ BunはそもそもZigによって処理を高速化しているのでかなり�
 
 ## その他の実行環境について
 
+paiza.io
+
+wandbox
+
+codepen
+
+---
+
+## node.jsのバージョン管理について
+
+基本的に最新版(LTS)をインストールしておくと問題はないのですが、古いバージョンでの検証がしたくなる場合は、
+npm
 
 
+---
+
+## npxコマンド
+
+一度だけ実行したいnpmライブラリのソフトウェアがある場合はnpxが便利です
+
+npx create-next-app my-next-app
+とか
 
 ---
 
@@ -424,6 +442,23 @@ https://book.mynavi.jp/ec/products/detail/id=65861
 社内に広く、マークアップから動的なWebについて伝える際にあると便利な一冊です。
 
 
+---
+
+Javascriptに関する情報を集めるには
+
+https://ics.media
+
+web技術全般
+https://www.publickey1.jp
+
+
+---
+
+これからJSを学ぶなら...
+
+AjaxとjQueryは避けた方がいいかも
+
+
 
 ---
 
@@ -450,3 +485,9 @@ Markup(html / css / Javascript)の開発経験について教えてください�
 また、同時に、普段、どのような言語での開発業務に携わっているかを記載ください。
 
 本年度、および来年度の解説の指標になります。
+
+
+JSONがわかる (任意のプログラムでJSON形式を表現あるいは読み込みと生成ができるか)
+
+WebAPI (REST)がわかる
+
