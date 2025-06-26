@@ -45,28 +45,22 @@ jobs:
       - name: Install Marp CLI
         run: npm install -g @marp-team/marp-cli
 
-      - name: Detect changed directories
-        id: changes
+      - name: Find all seminar directories
+        id: find-dirs
         run: |
-          # 変更されたファイルから日付ディレクトリを抽出
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # 手動実行の場合は全ての日付ディレクトリを処理
-            CHANGED_DATES=$(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort)
-          else
-            # プッシュの場合は変更されたディレクトリのみ
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-            CHANGED_DATES=$(echo "$CHANGED_FILES" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}/' | cut -d'/' -f1 | sort -u)
-          fi
+          # 全ての日付ディレクトリを取得
+          ALL_DATES=$(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort)
           
-          echo "Changed directories: $CHANGED_DATES"
+          echo "Found directories:"
+          echo "$ALL_DATES"
           
-          if [ -n "$CHANGED_DATES" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "changed_dates<<EOF" >> $GITHUB_OUTPUT
-            echo "$CHANGED_DATES" >> $GITHUB_OUTPUT
+          if [ -n "$ALL_DATES" ]; then
+            echo "has_directories=true" >> $GITHUB_OUTPUT
+            echo "all_dates<<EOF" >> $GITHUB_OUTPUT
+            echo "$ALL_DATES" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_directories=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Create docs directories
@@ -152,7 +146,7 @@ jobs:
           done
 
       - name: Generate site index
-        if: steps.changes.outputs.has_changes == 'true'
+        if: steps.find-dirs.outputs.has_directories == 'true'
         run: |
           cat > docs/index.html << 'HTMLEOF'
           <!DOCTYPE html>
@@ -260,7 +254,7 @@ jobs:
             
             # 今回更新されたかチェック
             IS_UPDATED=""
-            if echo "${{ steps.changes.outputs.changed_dates }}" | grep -q "$DATE_DIR"; then
+            if echo "${{ steps.find-dirs.outputs.all_dates }}" | grep -q "$DATE_DIR"; then
               IS_UPDATED="updated"
             fi
             
@@ -310,19 +304,19 @@ jobs:
           path: docs
 
       - name: Deploy to GitHub Pages
-        if: steps.changes.outputs.has_changes == 'true'
+        if: steps.find-dirs.outputs.has_directories == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
 
       - name: Summary
-        if: steps.changes.outputs.has_changes == 'true'
+        if: steps.find-dirs.outputs.has_directories == 'true'
         run: |
           echo "## 🎉 デプロイ完了!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "以下の資料が更新されました:" >> $GITHUB_STEP_SUMMARY
+          echo "以下の資料が処理されました:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "${{ steps.changes.outputs.changed_dates }}" | while read DATE_DIR; do
+          echo "${{ steps.find-dirs.outputs.all_dates }}" | while read DATE_DIR; do
             if [ -n "$DATE_DIR" ]; then
               echo "### 📅 $DATE_DIR" >> $GITHUB_STEP_SUMMARY
               
@@ -342,9 +336,9 @@ jobs:
           
           echo "🔗 **GitHub Pages URL:** ${{ steps.deployment.outputs.page_url }}" >> $GITHUB_STEP_SUMMARY
 
-      - name: Display no changes message
-        if: steps.changes.outputs.has_changes == 'false'
+      - name: Display no directories message
+        if: steps.find-dirs.outputs.has_directories == 'false'
         run: |
-          echo "## ℹ️ 変更なし" >> $GITHUB_STEP_SUMMARY
+          echo "## ℹ️ 処理対象なし" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "セミナー資料に関連する変更は検出されませんでした。" >> $GITHUB_STEP_SUMMARY
+          echo "日付形式（YYYY-MM-DD）のディレクトリが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY
