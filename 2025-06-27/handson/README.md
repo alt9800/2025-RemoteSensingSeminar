@@ -15,5 +15,9 @@
 
 [5-球体表示](./5-globeView/)
 
+[6-ファイルの読み込み](./6-readFiles)
+
+[7-距離の表示](./7-distance/)
+
 
 [0-おまけ](./0-node-lessons/)
