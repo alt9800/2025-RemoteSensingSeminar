@@ -685,6 +685,46 @@ package-lock.jsonではライブラリ間の依存関係や互換性のあるバ
 
 ## JSONとはどのような構造か
 
+```json
+{
+  "name": "太郎",
+  "age": 25,
+  "isStudent": true,
+  "hobbies": ["読書", "サッカー", "旅行"],
+  "address": {
+    "city": "東京",
+    "zipCode": "100-0001"
+  }
+}
+```
+
+
+---
+
+
+# ではGeojsonは？
+
+```geojson
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [139.6917, 35.6895],
+        [139.7661, 35.6812],
+        [139.7647, 35.6126],
+        [139.6917, 35.6895]
+      ]
+    ]
+  },
+  "properties": {
+    "name": "東京エリア"
+  }
+}
+
+```
+
 
 ---
 
