@@ -54,6 +54,7 @@ MapLibre GL JS を例に、Webフロントエンドにおけるデファクト�
 npmのインストール方法 (npm -v でWSLやPowershellで起動できればOK!)
 WSL(Ubuntu)/Power shellの動かし方
 Javascriptの文法
+React / Vue / Svelteのレンダリングエンジンについて
 →希望や必要があれば即習のような手配を行います。
 
 ---
@@ -71,7 +72,7 @@ Javascriptの文法
 https://maplibre.org
 
 
-Mapbox社が開発しているMapbox GL JSが開発していく中で、Mapboxのシステムを利用するOSS開発体制となったため、オープンプラットフォームで利用しやすく、かつ独立して開発できる体制を保つためにフォークして開発が始まったらWebGLベースの地図表示ライブラリです。
+Mapbox社が開発しているMapbox GL JSが開発していく中で、Mapboxのシステムを利用するOSS開発体制となったため、オープンプラットフォームで利用しやすく、かつ独立して開発できる体制を保つためにフォークして開発が始まったWebGLベースの地図表示ライブラリです。
 
 WebGLベースであることを活かして、3Dの演算も行え、Globeビューなども提供しています。
 
@@ -89,6 +90,28 @@ https://unopengis.github.io/learning/ja/intro
 
 ## Map Libre　GL JSで作られた面白いプロダクト
 
+
+* [今ここ何番地？](https://office-shirado.com/imakoko/map/#10.62/34.0537/131.4704)
+
+* [リミット１２](https://chosashi-data.org/shirado/limit12/map/#14.06/37.05433/140.88875)
+
+* [MAPPLE法務局地図ビューア](https://labs.mapple.com/mapplexml.html#15.72/34.694996/135.19563)
+
+上記二つは[土地家屋調査士の方](https://office-shirado.com)が作ってらっしゃいます。
+
+
+---
+
+## 今回よく使いそうな座標 (コピペ用)
+
+```javascript
+longitude: 131.2467,  // 宇部市の経度
+latitude: 33.9519,    // 宇部市の緯度
+```
+
+```javascript
+[131.2467,33.9519]
+```
 
 ---
 
@@ -287,11 +310,12 @@ npm install -g http-server //PC全体にhttp-serverの機能を導入
 ```
 
 もしくは、VSCodeを使ってる場合は、`Live-server`でもOK。
+それぞれ、ブラウザキャッシュ/サーバー側キャッシュに気をつけてください。強制リロードのやり方を知っておくとよいかも。
+
 
 ---
 
-(起動の様子 / できることの解説)
-
+(起動の様子 / できることの解説を提示)
 
 
 ---
@@ -424,43 +448,60 @@ https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/4-backgro
 
 ---
 
-MapLibre にデータを読み込んでみよう！
+# MapLibre にデータを読み込んでみよう！
 
 
 ---
 
-json
+山口県の公共データを取得してみましょう！
+https://yamaguchi-opendata.jp
 
-直書き
 
+[山口県緊急輸送道路ネットワーク計画（令和５年３月） - 緊急輸送道路（1次国道県道）.geojson - CKAN](https://yamaguchi-opendata.jp/ckan/dataset/kinkyuyusoudouro/resource/78e6b102-0cb2-493a-b856-c65318c6e1c4)
 
-csvを読み込む
-
-csvで読み込んだものを表にしたい
+[【周南市】文化財一覧 - 【周南市】文化財一覧_csv - CKAN](https://yamaguchi-opendata.jp/ckan/dataset/eg-mydataset/resource/5a71bcf0-2eb7-4b39-9df8-efad16f18d93)
 
 ---
+
+## csvとgeojsonの読み込みについて
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/6-readFiles/
+
+---
+
+## 距離を測ろう
+
+福田さんからいただいていた教材作成案を実装してみました。
+
+```
+①あらかじめ、地図上にポイントが２点表示されていて、その距離が計測できる。
+②地図上にポイントを１点打って現在地とポイント間の直線を結んで距離が計測できる。
+③地図上に既に表示されたポイントを任意の場所に動かす。
+```
+
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/7-distance/
+
+
+---
+## その他...時間があれば触れます。
 
 3Dの表示
 
 点群の表示
 
+---
 
+## 追跡アニメーションについて
+https://github.com/maplibre/maplibre-gl-directions
 
 ---
 
+## MapLibreの利用についてのルール / 背景地図のライセンス
 
-## MapLibreの利用についてのルール
-
-Web媒体としては使えるが、スクリーンショットなどとして使う時の権利表記がなされていなくて使えないものもある
+MapLibreを用いて制作していることを表記しておくと丁寧かも。
+背景地図について、Web媒体としては使えるが、スクリーンショットなどとして使う時の権利表記がなされていなくて使えないものもあり注意が必要です。
 
 
 ---
-
-
-
-
-
-
 
 
 # 補足記事
@@ -666,29 +707,224 @@ https://www.uxpin.com/studio/jp/blog-jp/魅力的でインタラクティブな�
 
 ---
 
-DeckGLの例
+# 他のフロントエンド地図ライブラリ事情
 
+---
+
+## DeckGLについて
+
+公式ページ
+https://deck.gl
+https://deck.gl/examples
+
+さらに知見を知りたい方はKeplerGLのコードを読むと良いかもしれません。
+https://kepler.gl
+
+
+DeckGLの例
+https://github.com/alt9800/Publications/tree/main/getting-started-deckgl
+https://github.com/alt9800/sample-maps/tree/main/deck-sample
+試行錯誤例
+https://alt9800.github.io/Publications/getting-started-deckgl/
+https://alt9800.github.io/sample-maps/deck-sample/
 
 
 ---
 
 Cesiumの例
 
+https://cesium.com/learn/cesiumjs-sandcastle/
+
+Cesium Ionを用いた災害状況のリポート(2024年能登半島震災)
+
+https://3dview.tokyo-digitaltwin.metro.tokyo.lg.jp/#share=s-zDdPb4LohEB1jylW
+
+3DGS版も
+https://noto3d.info/works/wajima_kawai_20240627
+
 
 ---
 
-Leafletとの比較
+## Leafletとの比較
 
+geojsonを追加したい！
+
+```javascript
+const map = L.map('map').setView([33.9519, 131.2467], 13);
+
+// タイルレイヤー
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+// GeoJSON地物の追加
+const geojsonFeature = {
+  type: "Feature",
+  geometry: {
+    type: "Polygon",
+    coordinates: [[[131.24,33.95],[131.25,33.95],[131.25,33.96],[131.24,33.96],[131.24,33.95]]]
+  },
+  properties: {
+    name: "エリアA"
+  }
+};
+
+L.geoJSON(geojsonFeature, {
+  style: {
+    color: "#ff7800",
+    weight: 2,
+    fillOpacity: 0.5
+  },
+  onEachFeature: function (feature, layer) {
+    layer.bindPopup(feature.properties.name);
+  }
+}).addTo(map);
+```
 
 
 ---
 
+### MapLibreの例
+全ての地物のスタイル指定がKey-Valueの形で統一されていることで人間がデータを読み書きしやすくなっていると思います。
 
-D3.jsの例
+```javascript
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {},
+    layers: []
+  },
+  center: [131.2467, 33.9519],
+  zoom: 13
+});
+
+// 地図読み込み完了後に追加
+map.on('load', function () {
+  map.addSource('my-geojson', {
+    type: 'geojson',
+    data: {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [[[131.24,33.95],[131.25,33.95],[131.25,33.96],[131.24,33.96],[131.24,33.95]]]
+      },
+      properties: { name: "エリアA" }
+    }
+  });
+
+  map.addLayer({
+    id: 'my-polygon-layer',
+    type: 'fill',
+    source: 'my-geojson',
+    paint: {
+      'fill-color': '#ff7800',
+      'fill-opacity': 0.5
+    }
+  });
+
+  map.addLayer({
+    id: 'my-outline',
+    type: 'line',
+    source: 'my-geojson',
+    paint: {
+      'line-color': '#ff0000',
+      'line-width': 2
+    }
+  });
+
+  map.on('click', 'my-polygon-layer', (e) => {
+    const name = e.features[0].properties.name;
+    new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setText(name)
+      .addTo(map);
+  });
+});
+
+
+
+```
 
 ---
 
-使いやすい書籍
+## D3.jsの例
+統計ソフトウェア
+https://alt9800.github.io/spaceappchallenge2024/
+
+似たようなことは他のデータ可視化基盤(Tableauなど)でも容易にできます。
+
+
+---
+
+## 抑えておくべきか？　Overtureマップ
+
+https://overturemaps.org
+
+```sh
+# ライブラリのインストール
+pip install overturemaps
+
+# コマンドでデータをダウンロード (例: ボストン中心部の建物データ)
+overturemaps download --bbox=-71.068,42.353,-71.058,42.363 -f geojson --type=building -o boston.geojson
+
+```
+
+---
+
+### コードはこれくらいではあるが...
+
+
+```javascript
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>OvertureMapを表示</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src='https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<script>
+    const map = new maplibregl.Map({
+        container: 'map', // container id
+        style: 'https://demotiles.maplibre.org/style.json', // スタイルURL
+        center: [-71.06, 42.36], // 中心座標 [lng, lat]
+        zoom: 15 // ズームレベル
+    });
+
+    map.on('load', () => {
+        // ダウンロードしたGeoJSONを読み込む
+        map.addSource('buildings', {
+            'type': 'geojson',
+            'data': './boston.geojson' // GeoJSONファイルへのパス
+        });
+
+        // 読み込んだデータを地図上に追加する
+        map.addLayer({
+            'id': 'buildings-layer',
+            'type': 'fill',
+            'source': 'buildings',
+            'paint': {
+                'fill-color': '#0080ff',
+                'fill-opacity': 0.5
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
+```
+
+---
+
+## 使いやすい書籍
 
 
 

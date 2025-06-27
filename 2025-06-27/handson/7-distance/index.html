@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <title>MapLibre GL JS インタラクション実装例</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://npmcdn.com/@turf/turf/turf.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .info-box {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-family: sans-serif;
+            z-index: 1;
+        }
+        /* ポイントをドラッグ可能にみせるためのカーソル変更 */
+        .mapboxgl-canvas-container.mapboxgl-interactive .mapboxgl-canvas:hover {
+            cursor: grab;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div class="info-box">
+    <h3>距離情報</h3>
+    <p><strong>① 初期ポイント間:</strong> <span id="distance-initial">---</span> km</p>
+    <p><strong>② 現在地とクリック地点間:</strong> <span id="distance-user">---</span> km</p>
+</div>
+
+<script>
+    // ----------------------------------------------------------------
+    // 1. 地図の初期化
+    // ----------------------------------------------------------------
+    const map = new maplibregl.Map({
+        container: 'map',
+        // 国土地理院のベクトルタイルスタイルを指定
+        style: 'https://gsi-cyberjapan.github.io/gsivectortile-mapbox-gl-js/std.json',
+        center: [139.7525, 35.6841], // 初期表示の中心（東京駅付近）
+        zoom: 12
+    });
+
+    let userLocation = null; // ユーザーの現在地を格納する変数
+
+    // ----------------------------------------------------------------
+    // 2. 地図読み込み完了後の処理
+    // ----------------------------------------------------------------
+    map.on('load', () => {
+        // --- ① あらかじめ、地図上にポイントが2点表示されていて、その距離が計測できる ---
+
+        // 初期表示する2点のGeoJSONデータ
+        const initialPoints = {
+            'type': 'FeatureCollection',
+            'features': [
+                { 'type': 'Feature', 'geometry': { 'type': 'Point', 'coordinates': [139.7671, 35.6812] }, 'properties': { 'id': 'point1' } }, // 東京駅
+                { 'type': 'Feature', 'geometry': { 'type': 'Point', 'coordinates': [139.7005, 35.6586] }, 'properties': { 'id': 'point2' } }  // 渋谷駅
+            ]
+        };
+
+        // ポイント用のソースとレイヤーを追加
+        map.addSource('initial-points', {
+            'type': 'geojson',
+            'data': initialPoints
+        });
+        map.addLayer({
+            'id': 'initial-points-layer',
+            'type': 'circle',
+            'source': 'initial-points',
+            'paint': {
+                'circle-radius': 10,
+                'circle-color': '#007cbf',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff'
+            }
+        });
+
+        // 2点を結ぶ線用のソースとレイヤーを追加
+        map.addSource('initial-line', {
+            'type': 'geojson',
+            'data': turf.lineString(initialPoints.features.map(f => f.geometry.coordinates))
+        });
+        map.addLayer({
+            'id': 'initial-line-layer',
+            'type': 'line',
+            'source': 'initial-line',
+            'layout': {
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            'paint': {
+                'line-color': '#007cbf',
+                'line-width': 4,
+                'line-dasharray': [2, 2]
+            }
+        });
+
+        // 距離を計算して表示する関数
+        const calculateInitialDistance = () => {
+            const coords = initialPoints.features.map(f => f.geometry.coordinates);
+            const from = turf.point(coords[0]);
+            const to = turf.point(coords[1]);
+            const distance = turf.distance(from, to, { units: 'kilometers' });
+            document.getElementById('distance-initial').textContent = distance.toFixed(2);
+        };
+
+        calculateInitialDistance(); // 初期距離を計算
+
+        // --- ② 地図上にポイントを1点打って現在地とポイント間の直線を結んで距離が計測できる ---
+
+        // 現在地取得コントロールを追加
+        const geolocate = new maplibregl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: true,
+            showUserHeading: true
+        });
+        map.addControl(geolocate);
+
+        geolocate.on('geolocate', (e) => {
+            userLocation = [e.coords.longitude, e.coords.latitude];
+            console.log('現在地が更新されました:', userLocation);
+        });
+
+        // クリック地点と現在地を結ぶ線とポイントのソースを空で初期化
+        map.addSource('clicked-point', { 'type': 'geojson', 'data': null });
+        map.addSource('user-line', { 'type': 'geojson', 'data': null });
+
+        map.addLayer({
+            'id': 'clicked-point-layer', 'type': 'circle', 'source': 'clicked-point',
+            'paint': { 'circle-radius': 8, 'circle-color': '#d95f02' }
+        });
+        map.addLayer({
+            'id': 'user-line-layer', 'type': 'line', 'source': 'user-line',
+            'paint': { 'line-color': '#d95f02', 'line-width': 4 }
+        });
+
+        // 地図クリック時のイベント
+        map.on('click', (e) => {
+            const clickedLngLat = [e.lngLat.lng, e.lngLat.lat];
+            
+            // クリック地点にポイントを表示
+            const clickedPointGeoJSON = turf.point(clickedLngLat);
+            map.getSource('clicked-point').setData(clickedPointGeoJSON);
+            
+            // 現在地が取得済みの場合、線と距離を更新
+            if (userLocation) {
+                const userLineGeoJSON = turf.lineString([userLocation, clickedLngLat]);
+                map.getSource('user-line').setData(userLineGeoJSON);
+
+                const distance = turf.distance(turf.point(userLocation), turf.point(clickedLngLat), { units: 'kilometers' });
+                document.getElementById('distance-user').textContent = distance.toFixed(2);
+            } else {
+                alert('先に左上のボタンで現在地を取得してください。');
+                document.getElementById('distance-user').textContent = '---';
+                map.getSource('user-line').setData(null);
+            }
+        });
+
+
+        // --- ③ 地図上に既に表示されたポイントを任意の場所に動かす ---
+
+        let draggedPoint = null;
+
+        map.on('mousedown', 'initial-points-layer', (e) => {
+            // 地図のパン（移動）を無効化
+            e.preventDefault();
+            map.getCanvas().style.cursor = 'grabbing';
+            
+            // クリックされたポイントのIDを取得
+            const features = map.queryRenderedFeatures(e.point, { layers: ['initial-points-layer'] });
+            if (!features.length) {
+                return;
+            }
+            draggedPoint = features[0].properties.id;
+
+            // mousemoveとmouseupイベントのリスナーを設定
+            map.on('mousemove', onMouseMove);
+            map.on('mouseup', onMouseUp);
+        });
+
+        const onMouseMove = (e) => {
+            if (!draggedPoint) return;
+            const coords = [e.lngLat.lng, e.lngLat.lat];
+
+            // GeoJSONデータを更新
+            const targetFeature = initialPoints.features.find(f => f.properties.id === draggedPoint);
+            targetFeature.geometry.coordinates = coords;
+
+            // ポイント、線、距離を更新
+            map.getSource('initial-points').setData(initialPoints);
+            map.getSource('initial-line').setData(turf.lineString(initialPoints.features.map(f => f.geometry.coordinates)));
+            calculateInitialDistance();
+        };
+
+        const onMouseUp = () => {
+            if (!draggedPoint) return;
+            map.getCanvas().style.cursor = '';
+            draggedPoint = null;
+
+            // イベントリスナーを解除
+            map.off('mousemove', onMouseMove);
+            map.off('mouseup', onMouseUp);
+        };
+    });
+
+</script>
+
+</body>
+</html>
