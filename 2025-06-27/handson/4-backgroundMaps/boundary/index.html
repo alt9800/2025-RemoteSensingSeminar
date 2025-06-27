@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MapLibre タイル境界表示マップ</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            min-width: 250px;
+        }
+        
+        .control-panel h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .info-item {
+            margin: 8px 0;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .toggle-button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        
+        .toggle-button:hover {
+            background: #005a87;
+        }
+        
+        .toggle-button.active {
+            background: #ff6b6b;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .modal-info {
+            margin: 10px 0;
+            font-size: 15px;
+        }
+        
+        .modal-info strong {
+            color: #333;
+            display: inline-block;
+            width: 120px;
+        }
+        
+        .info-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .info-button:hover {
+            background: #218838;
+        }
+        
+        .style-selector {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .style-selector h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .style-selector select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="control-panel">
+        <h3>🗺️ マップ情報</h3>
+        <div class="info-item">
+            <span class="info-label">ズームレベル:</span>
+            <span id="zoom-level">10</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">緯度:</span>
+            <span id="latitude">35.6762</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">経度:</span>
+            <span id="longitude">139.6503</span>
+        </div>
+        <button id="toggle-tiles" class="toggle-button">タイル境界を表示</button>
+        
+        <div class="style-selector">
+            <h4>🎨 マップスタイル</h4>
+            <select id="style-selector">
+                <option value="osm">OpenStreetMap</option>
+                <option value="osm-humanitarian">人道支援スタイル</option>
+                <option value="cartodb-positron">CartoDB Positron</option>
+                <option value="cartodb-dark">CartoDB Dark</option>
+                <option value="stamen-toner">Stamen Toner</option>
+                <option value="stamen-terrain">Stamen Terrain</option>
+                <option value="wikimedia">Wikimedia</option>
+                <option value="esri-world-imagery">衛星画像 (Esri)</option>
+            </select>
+        </div>
+    </div>
+    
+    <button id="info-button" class="info-button">ℹ️</button>
+    
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">マップ詳細情報</h2>
+                <button class="close">&times;</button>
+            </div>
+            <div class="modal-info">
+                <strong>現在のズーム:</strong> <span id="modal-zoom">10</span>
+            </div>
+            <div class="modal-info">
+                <strong>中心緯度:</strong> <span id="modal-lat">35.6762</span>°
+            </div>
+            <div class="modal-info">
+                <strong>中心経度:</strong> <span id="modal-lng">139.6503</span>°
+            </div>
+            <div class="modal-info">
+                <strong>タイルソース:</strong> <span id="modal-source">OpenStreetMap</span>
+            </div>
+            <div class="modal-info">
+                <strong>座標系:</strong> Web Mercator (EPSG:3857)
+            </div>
+            <div class="modal-info">
+                <strong>タイル境界:</strong> <span id="modal-tiles-status">非表示</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // タイルサービスの定義
+        const tileServices = {
+            'osm': {
+                name: 'OpenStreetMap',
+                url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                attribution: '© OpenStreetMap contributors'
+            },
+            'stamen-toner': {
+                name: 'Stamen Toner',
+                url: 'https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}.png',
+                attribution: '© Stamen Design, © OpenStreetMap contributors'
+            },
+            'stamen-terrain': {
+                name: 'Stamen Terrain',
+                url: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png',
+                attribution: '© Stamen Design, © OpenStreetMap contributors'
+            },
+            'esri-world-imagery': {
+                name: 'Esri World Imagery',
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attribution: '© Esri, © OpenStreetMap contributors'
+            }
+        };
+
+        // マップの初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    'current-tiles': {
+                        type: 'raster',
+                        tiles: [tileServices.osm.url],
+                        tileSize: 256,
+                        attribution: tileServices.osm.attribution
+                    }
+                },
+                layers: [
+                    {
+                        id: 'current-tiles',
+                        type: 'raster',
+                        source: 'current-tiles'
+                    }
+                ]
+            },
+            center: [139.6503, 35.6762], // 東京
+            zoom: 10
+        });
+
+        // UI要素の取得
+        const zoomElement = document.getElementById('zoom-level');
+        const latElement = document.getElementById('latitude');
+        const lngElement = document.getElementById('longitude');
+        const toggleButton = document.getElementById('toggle-tiles');
+        const infoButton = document.getElementById('info-button');
+        const modal = document.getElementById('info-modal');
+        const closeButton = document.querySelector('.close');
+        const styleSelector = document.getElementById('style-selector');
+        
+        let tilesVisible = false;
+        let currentStyle = 'osm';
+
+        // 情報更新関数
+        function updateInfo() {
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            
+            zoomElement.textContent = zoom.toFixed(2);
+            latElement.textContent = center.lat.toFixed(6);
+            lngElement.textContent = center.lng.toFixed(6);
+            
+            // モーダル内の情報も更新
+            document.getElementById('modal-zoom').textContent = zoom.toFixed(2);
+            document.getElementById('modal-lat').textContent = center.lat.toFixed(6);
+            document.getElementById('modal-lng').textContent = center.lng.toFixed(6);
+        }
+
+        // タイルスタイルの変更
+        function changeStyle(styleId) {
+            const service = tileServices[styleId];
+            if (!service) return;
+            
+            // タイル境界が表示されている場合は一時的に非表示
+            const wasTilesVisible = tilesVisible;
+            if (tilesVisible) {
+                toggleTileBoundaries();
+            }
+            
+            // ソースを更新
+            map.getSource('current-tiles').setTiles([service.url]);
+            
+            // アトリビューションを更新（可能な場合）
+            currentStyle = styleId;
+            
+            // タイル境界を再表示
+            if (wasTilesVisible) {
+                setTimeout(() => toggleTileBoundaries(), 100);
+            }
+            
+            // モーダル情報を更新
+            document.getElementById('modal-tiles-status').textContent = tilesVisible ? '表示中' : '非表示';
+        }
+
+        // タイル境界の表示/非表示
+        function toggleTileBoundaries() {
+            if (tilesVisible) {
+                // タイル境界を非表示
+                if (map.getLayer('tile-boundaries')) {
+                    map.removeLayer('tile-boundaries');
+                }
+                if (map.getSource('tile-grid')) {
+                    map.removeSource('tile-grid');
+                }
+                toggleButton.textContent = 'タイル境界を表示';
+                toggleButton.classList.remove('active');
+                document.getElementById('modal-tiles-status').textContent = '非表示';
+                tilesVisible = false;
+            } else {
+                // タイル境界を表示
+                addTileBoundaries();
+                toggleButton.textContent = 'タイル境界を非表示';
+                toggleButton.classList.add('active');
+                document.getElementById('modal-tiles-status').textContent = '表示中';
+                tilesVisible = true;
+            }
+        }
+
+        // タイル境界の追加
+        function addTileBoundaries() {
+            const zoom = Math.floor(map.getZoom());
+            const bounds = map.getBounds();
+            
+            // タイル境界のGeoJSONデータを生成
+            const tileGrid = generateTileGrid(bounds, zoom);
+            
+            map.addSource('tile-grid', {
+                type: 'geojson',
+                data: tileGrid
+            });
+
+            map.addLayer({
+                id: 'tile-boundaries',
+                type: 'line',
+                source: 'tile-grid',
+                paint: {
+                    'line-color': '#ff0000',
+                    'line-width': 2,
+                    'line-opacity': 0.8
+                }
+            });
+        }
+
+        // タイルグリッドの生成
+        function generateTileGrid(bounds, zoom) {
+            const features = [];
+            
+            // タイル座標の計算
+            const nwTile = deg2tile(bounds.getNorth(), bounds.getWest(), zoom);
+            const seTile = deg2tile(bounds.getSouth(), bounds.getEast(), zoom);
+            
+            // 横線の生成
+            for (let y = Math.max(0, nwTile.y - 1); y <= seTile.y + 1; y++) {
+                const lat = tile2deg(0, y, zoom).lat;
+                features.push({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [
+                            [bounds.getWest() - 1, lat],
+                            [bounds.getEast() + 1, lat]
+                        ]
+                    }
+                });
+            }
+            
+            // 縦線の生成
+            for (let x = Math.max(0, nwTile.x - 1); x <= seTile.x + 1; x++) {
+                const lng = tile2deg(x, 0, zoom).lng;
+                features.push({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [
+                            [lng, bounds.getSouth() - 0.5],
+                            [lng, bounds.getNorth() + 0.5]
+                        ]
+                    }
+                });
+            }
+            
+            return {
+                type: 'FeatureCollection',
+                features: features
+            };
+        }
+
+        // 度数をタイル座標に変換
+        function deg2tile(lat_deg, lon_deg, zoom) {
+            const lat_rad = lat_deg * Math.PI / 180;
+            const n = Math.pow(2, zoom);
+            const x = Math.floor((lon_deg + 180) / 360 * n);
+            const y = Math.floor((1 - Math.asinh(Math.tan(lat_rad)) / Math.PI) / 2 * n);
+            return { x: x, y: y };
+        }
+
+        // タイル座標を度数に変換
+        function tile2deg(x, y, zoom) {
+            const n = Math.pow(2, zoom);
+            const lng = x / n * 360 - 180;
+            const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
+            const lat = lat_rad * 180 / Math.PI;
+            return { lat: lat, lng: lng };
+        }
+
+        // イベントリスナー
+        map.on('load', updateInfo);
+        map.on('move', updateInfo);
+        map.on('zoom', () => {
+            updateInfo();
+            if (tilesVisible) {
+                // ズーム時にタイル境界を更新
+                if (map.getLayer('tile-boundaries')) {
+                    map.removeLayer('tile-boundaries');
+                    map.removeSource('tile-grid');
+                    addTileBoundaries();
+                }
+            }
+        });
+
+        toggleButton.addEventListener('click', toggleTileBoundaries);
+
+        // スタイル選択のイベントリスナー
+        styleSelector.addEventListener('change', (e) => {
+            changeStyle(e.target.value);
+            // モーダルのソース情報も更新
+            document.getElementById('modal-source').textContent = tileServices[e.target.value].name;
+        });
+
+        // モーダル制御
+        infoButton.addEventListener('click', () => {
+            updateInfo(); // モーダルを開く前に情報を更新
+            modal.style.display = 'block';
+        });
+
+        closeButton.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // ナビゲーションコントロールの追加
+        map.addControl(new maplibregl.NavigationControl());
+        map.addControl(new maplibregl.ScaleControl());
+    </script>
+</body>
+</html>

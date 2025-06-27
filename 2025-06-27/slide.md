@@ -298,7 +298,7 @@ npm install -g http-server //PC全体にhttp-serverの機能を導入
 
 ## ユーザーインタラクション (地図に重ねるボタン)について
 
-地図を読み込んだ後に、mapインスタンスに対して、addControlメソッドでボタンを配置することができる
+地図を読み込んだ後に、mapインスタンスに対して、addControlメソッドでボタンを配置することができます。
 ```javascript
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
 map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
@@ -317,14 +317,110 @@ https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/3-userInt
 
 ---
 
+## 距離と測地系について
 
-背景地図について
+MapLibreでは前述のようにスケールバーの表示が行えるため、m単位で距離を測ることができます。
 
+つまり、投影座標系(平面直角座標系)として扱われています。
+
+具体的には **EPSG:3857** の Web Mercator (Pseudo-Mercator)です。
+
+(Google Mapをはじめ　特にTileMapにおいて採用されている)
+
+---
+
+ただし、MapLibreにおいてはこれは経度方向(東西方向)の誤差が小さくなるように計算されているため、回転させたときに誤差が変動します。なお、円を描く際などはこれらが考慮されて描画されます。
+
+|回転角度|表示距離|実際の距離|誤差|
+|:---:|:---:|:---:|:---:|
+|0°|1km|1.000km|0%|
+|30°|1km|1.155km|+15.5%|
+|45°|1km|1.414km|+41.4%|
+|60°|1km|2.000km|+100%|
+|90°|1km|1.000km|無限大に発散|
+
+(直角三角形の性質より単純計算)
+
+---
+
+投影座標系と地理座標系についてはこちらを参照ください。
+
+https://lemulus.me/column/epsg-list-gis
+
+なお、GPSについては **EPSG：4326 (WGS84)** を利用しているため、各GISにおいては、緯度経度で与えた情報を、描画時に投影座標系に変換している格好です。
 
 
 ---
 
-グローブビューについて
+## 背景地図について
+
+
+MapLibreでは従来の地図アプリケーションのようにタイルマップを読み込むことができる他、
+ベクターレイヤーを読み込むことができます。
+これらはjson形式でスタイリングを読み込まれます。
+
+参考実装
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/4-backgroundMaps/
+
+---
+
+透明度の変更を行うこともできます(以下はスライダーで変更をかける例)
+
+```html
+<div>
+    <label for="opacity">透明度: <span id="opacity-value">100%</span></label>
+    <input type="range" id="opacity" min="0" max="100" value="100">
+</div>
+
+<script>
+const slider = document.getElementById('opacity');
+const valueDisplay = document.getElementById('opacity-value');
+
+slider.addEventListener('input', (e) => {
+    const value = e.target.value;
+    const opacity = value / 100;
+    
+    valueDisplay.textContent = value + '%';
+    
+    // 特定のレイヤーの透明度を変更
+    map.setPaintProperty('my-layer-id', 'raster-opacity', opacity);
+});
+</script>
+
+
+```
+
+
+---
+
+ズームレベルとタイルを表示するようにするサンプル
+
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-06-27/4-backgroundMaps/boundary/
+
+
+---
+
+## データは自分でもつくることができる
+
+
+タイルの配信やベクター形式での配信を行うことができます。
+
+地図のスタイル作成に特化したサービスも複数あるので、「どのレベルで自作するか」を選ぶこともできます。
+
+* MapTiler
+* HERE
+* Carto
+* Felt
+
+
+[現場のプロがわかりやすく教える 位置情報デベロッパー養成講座 - 秀和システム あなたの学びをサポート！](https://www.shuwasystem.co.jp/book/9784798072241.html) をみるべし！
+
+
+---
+
+## グローブビューについて
+
+[Display a globe with a fill extrusion layer - MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/examples/globe-fill-extrusion/)
 
 ---
 
@@ -344,17 +440,26 @@ csvで読み込んだものを表にしたい
 
 ---
 
+3Dの表示
+
+点群の表示
+
+
+
+---
+
 
 ## MapLibreの利用についてのルール
 
+Web媒体としては使えるが、スクリーンショットなどとして使う時の権利表記がなされていなくて使えないものもある
 
 
 ---
 
 
-距離と測地系について
 
----
+
+
 
 
 
@@ -555,7 +660,33 @@ Javascriptにおける機能の合意などの標準化についてはEuropean C
 `let`によるレキシカルスコープ、アロー関数を用いたthisバインディングの一つ上の階層への固定化によるコールバックの簡便化、バッククオートを用いたバインディング、クラス構文、import/exportによるモジュールの活用、Promise型の導入による非同期処理の強化、などが目玉でした。
 
 ---
+## インタラクティブとはどういうことか？
+https://www.uxpin.com/studio/jp/blog-jp/魅力的でインタラクティブなウェブサイト/
+実際に体験してみると良いかと思います。
 
+---
+
+DeckGLの例
+
+
+
+---
+
+Cesiumの例
+
+
+---
+
+Leafletとの比較
+
+
+
+---
+
+
+D3.jsの例
+
+---
 
 使いやすい書籍
 
@@ -650,12 +781,27 @@ https://www.geograph.teikokushoin.co.jp
 
 ---
 
+## データソースに関する展望
+
+利用できる地物が増えつつあります。
+道路情報に関しては国土交通省がXRoadプロジェクトを立ち上げているので、こちらに意見を投げてみましょう。
+
+DEMも拡充されつつあります。
+
+
+---
 
 ## その他のニュース
 
 彗星の如く現れたGemini CLI
 https://cloud.google.com/blog/ja/topics/developers-practitioners/introducing-gemini-cli/
 
+
+ちなみにClaude Codeも
+```
+npm install -g @anthropic-ai/claude-code
+```
+でインストールできる
 
 ---
 
@@ -665,7 +811,6 @@ Markup(html / css / Javascript)の開発経験について教えてください�
 また、同時に、普段、どのような言語での開発業務に携わっているかを記載ください。
 
 本年度、および来年度の解説の指標になります。
-
 
 JSONがわかる (任意のプログラムでJSON形式を表現あるいは読み込みと生成ができるか)
 

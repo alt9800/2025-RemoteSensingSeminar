@@ -1,4 +1,7 @@
 ライブラリの準備
+
+[prj](./prj/)に移動して、
+
 ```sh
 npm init
 npm install maplibre-gl

@@ -11,5 +11,9 @@
 
 [3-地図に重ねるボタン](./3-userInteractions/)
 
+[4-背景地図](./4-backgroundMaps)
 
-[0-おまけ](./0-node-lessons/)f
+[5-球体表示](./5-globeView/)
+
+
+[0-おまけ](./0-node-lessons/)
