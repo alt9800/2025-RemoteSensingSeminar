@@ -13,9 +13,71 @@ backgroundColor: #fff
 
 ---
 
-https://www.osgeo.jp/events/2025-2/foss4g-2025-kansai/foss4g-2025-kansai-ハンズオンデイ#Deep
+今回の趣旨 :
+Leafletでできることをいろいろみながら、時折手を動かしつつ、実装を眺めて、
+LLMから吐かれるコードを理解できるようになろう！！
+
+(座学が多いのでみんなで和気藹々できればいいな / 実装したい！ってところがあれば随時止めてください。)
 
 ---
+
+サイト
+https://www.osgeo.jp/events/2025-2/foss4g-2025-kansai/foss4g-2025-kansai-ハンズオンデイ#Deep
+
+資料
+https://alt9800.github.io/2025-RemoteSensingSeminar/
+
+ソースコード
+https://github.com/alt9800/2025-RemoteSensingSeminar/tree/main/2025-07-06
+
+---
+
+## 元ネタ
+### 2024年度 衛星データ解析技術研究会　技術セミナー（応用編）講義内容
+
+ソースコード
+https://github.com/alt9800/sample-maps/tree/main/Seminar
+
+
+スライド
+https://drive.google.com/drive/folders/1mpv-9r0SVznrseM16jQox6dWk6aayStv?usp=sharing
+
+
+
+---
+
+---
+
+# 自己紹介
+
+--- 
+<img src="./assets/profile.jpg" class="round-icon">
+
+講師紹介 : 田中
+✉️ : alt9800jp@gmail.com
+
+OSGeoJP 運営委員
+
+最近やってること
+LiDARや機械学習による測量支援 / 屋内の地図化ツール/
+点字ブロック Lineデータ作成 /Web における3D
+
+お仕事
+https://ikominaprj.xsrv.jp/AR/
+趣味
+https://simplespeedtest-amaranth.web.app
+https://alt9800.github.io/visualization/prefecture-viewer/
+登壇 
+iOSDC2025 : https://fortee.jp/iosdc-japan-2024/proposal/afbcd097-0da9-4073-8f48-528f007e28b7
+
+---
+
+最近つくってるもの
+https://solemate-3xn.pages.dev
+
+
+---
+
 
 # アジェンダ
 
