@@ -1,8 +1,36 @@
 ---
 marp: true
-theme: gaia
+theme: default
+header: "FOSS4G 2025 KANSAI ハンズオンデイ すこし”Deep”なLeaflet エコシステム"
+footer: "2025/07/06 alt9800"
+
 paginate: true
-backgroundColor: #fff
+
+style: |
+    section.title {
+        justify-content: center;
+        text-align: left;
+    }
+    .round-icon {
+      position: absolute;
+      top: 50px;
+      right: 50px;
+      width: 400px;
+      height: 400px;
+      border-radius: 20%;
+      object-fit: cover;
+      z-index: 10;
+    }
+    .tiny-text {
+    font-size: 0.6em;  /* 通常の60%サイズ */
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+
 ---
 
 <!-- _class: lead -->
@@ -13,11 +41,15 @@ backgroundColor: #fff
 
 ---
 
-今回の趣旨 :
+### 今回の趣旨 :
 Leafletでできることをいろいろみながら、時折手を動かしつつ、実装を眺めて、
 LLMから吐かれるコードを理解できるようになろう！！
 
 (座学が多いのでみんなで和気藹々できればいいな / 実装したい！ってところがあれば随時止めてください。)
+
+---
+
+## 機能要件や設計を理解して、安定したコードを吐かせれるようになろう
 
 ---
 
@@ -42,9 +74,6 @@ https://github.com/alt9800/sample-maps/tree/main/Seminar
 スライド
 https://drive.google.com/drive/folders/1mpv-9r0SVznrseM16jQox6dWk6aayStv?usp=sharing
 
-
-
----
 
 ---
 
@@ -79,7 +108,7 @@ https://solemate-3xn.pages.dev
 ---
 
 
-# アジェンダ
+# 基礎についてのアジェンダ
 
 1. **Leaflet基礎** - 地図の表示と基本操作
 2. **インタラクティブ機能** - ドラッグ&ドロップ、メニューバー実装
@@ -88,8 +117,6 @@ https://solemate-3xn.pages.dev
 5. **パフォーマンス最適化** - 大量データの効率的な描画
 
 ---
-
-<!-- _class: lead -->
 
 # 第1章
 ## Leaflet基礎編
@@ -458,16 +485,28 @@ map.addLayer(markers);
   - CodePen examples
 
 - **コミュニティ**
-  - Stack Overflow
-  - Leaflet Forum
+  - OSGeo(JP)
+  - OpenStreetMap Foundation Japan
 
 ---
 
-<!-- _class: lead -->
+さらに面白そうな使い方
 
-# ご質問はありますか？
+https://game8.jp/pokemon-legends/424101
 
-## 実装でお困りのことがあれば
-## お気軽にお聞きください！
+---
 
-### Happy Mapping! 🗺️
+タイルの読み込みをするアプリケーションなので、Staticな画像を使うことができる
+
+関連技術 : ジオリファレンス
+
+---
+
+# QGIS to Web
+
+https://plugins.qgis.org/plugins/qgis2web/
+
+---
+
+# サンプル
+https://alt9800.github.io/sample-maps/sukesan-2023-07-29/#8/34.441/132.004
