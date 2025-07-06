@@ -512,3 +512,26 @@ https://plugins.qgis.org/plugins/qgis2web/
 
 # サンプル
 https://alt9800.github.io/sample-maps/sukesan-2023-07-29/#8/34.441/132.004
+
+
+
+---
+
+## デフォルトの座標系
+Leafletでは、地理座標系（緯度・経度）をそのまま使用することが基本設計となっています。L.latLng(緯度, 経度)という形式で座標を指定し、内部的にWeb Mercator（EPSG:3857）に投影変換して表示します。
+MapLibreは、内部的にWeb Mercatorで動作しますが、APIレベルでは[経度, 緯度]の順番で配列として座標を扱います。GeoJSON仕様に準拠した設計となっているため、座標の順序がLeafletとは逆になっています
+
+---
+
+影法のサポート
+Leafletは、プラグイン（Proj4Leaflet）を使用することで様々な投影法をサポートできます。これにより、国土地理院の平面直角座標系など、特殊な座標系も扱えます：
+javascript// Leafletでカスタム投影法を使用
+var crs = new L.Proj.CRS('EPSG:2451', 
+  '+proj=tmerc +lat_0=33 +lon_0=131 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs');
+MapLibreは、基本的にWeb Mercatorに最適化されており、他の投影法への対応は限定的です。カスタム投影法を使用する場合は、事前に座標変換を行う必要があります。
+
+
+---
+
+Leafletでは、project()とunproject()メソッドで地理座標とピクセル座標の相互変換が簡単に行えます。また、異なるズームレベルでの変換も柔軟に対応できます。
+MapLibreでは、project()とunproject()メソッドも提供されていますが、主にマップボックスのベクトルタイル仕様に最適化された実装となっています。

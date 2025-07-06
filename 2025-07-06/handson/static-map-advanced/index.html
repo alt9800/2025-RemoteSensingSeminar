@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リアルワールドARPGマップ</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.8);
+            padding: 15px 20px;
+            backdrop-filter: blur(10px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: normal;
+        }
+        
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .mode-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .mode-btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        
+        /* ロケーションマーカー */
+        .quest-marker {
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #fbbf24 0%, #f59e0b 100%);
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .quest-marker.completed {
+            background: radial-gradient(circle, #10b981 0%, #059669 100%);
+        }
+        
+        .quest-marker:hover {
+            transform: scale(1.2);
+        }
+        
+        /* プレイヤー位置マーカー */
+        .player-marker {
+            width: 30px;
+            height: 30px;
+            background: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            position: relative;
+        }
+        
+        .player-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+            }
+        }
+        
+        /* 距離インジケーター */
+        .distance-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 15px 30px;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        .distance-text {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        .distance-hint {
+            font-size: 14px;
+            color: #9ca3af;
+        }
+        
+        /* ポップアップカスタマイズ */
+        .leaflet-popup-content-wrapper {
+            background: rgba(0,0,0,0.9);
+            color: white;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .leaflet-popup-tip {
+            background: rgba(0,0,0,0.9);
+        }
+        
+        .quest-popup {
+            padding: 10px;
+            min-width: 200px;
+        }
+        
+        .quest-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #fbbf24;
+        }
+        
+        .quest-desc {
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        
+        .quest-reward {
+            font-size: 14px;
+            color: #10b981;
+            margin-bottom: 10px;
+        }
+        
+        .quest-distance {
+            font-size: 14px;
+            color: #9ca3af;
+        }
+        
+        /* AR モード UI */
+        .ar-overlay {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .ar-overlay.active {
+            display: block;
+        }
+        
+        .ar-compass {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .ar-direction {
+            text-align: center;
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>リアルワールドARPG</h1>
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setMode('map')">マップ</button>
+            <button class="mode-btn" onclick="setMode('ar')">ARモード</button>
+        </div>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div class="ar-overlay" id="arOverlay">
+        <div class="ar-compass">🧭 <span id="compassHeading">0</span>°</div>
+        <div class="ar-direction">最寄りのクエスト: <span id="nearestQuest">-</span></div>
+    </div>
+    
+    <div class="distance-indicator" id="distanceIndicator">
+        <div class="distance-text">最寄りのクエストまで <span id="nearestDistance">-</span></div>
+        <div class="distance-hint">実際の場所に移動してクリア！</div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    
+    <script>
+        // マップモード管理
+        let currentMode = 'map';
+        let playerLocation = null;
+        let playerMarker = null;
+        let watchId = null;
+        
+        // マップの初期化（実際の地図とゲームマップの切り替え可能）
+        const map = L.map('map', {
+            center: [35.6762, 139.6503], // 東京駅周辺
+            zoom: 15
+        });
+        
+        // ベースレイヤー（実際の地図）
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        });
+        
+        // ダークテーマの地図
+        const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors & CartoDB'
+        });
+        
+        darkLayer.addTo(map);
+        
+        // クエストロケーション（実際の座標にマッピング）
+        const quests = [
+            {
+                id: 1,
+                name: "竜の門",
+                desc: "古代の守護竜が眠る場所",
+                reward: "経験値 +500, ゴールド +100",
+                lat: 35.6762,
+                lng: 139.6503,
+                level: 1
+            },
+            {
+                id: 2,
+                name: "魔法の泉",
+                desc: "癒しの力を持つ神秘的な泉",
+                reward: "HP全回復, MP +50",
+                lat: 35.6785,
+                lng: 139.6520,
+                level: 2
+            },
+            {
+                id: 3,
+                name: "商人の広場",
+                desc: "珍しいアイテムが手に入る",
+                reward: "レアアイテム獲得チャンス",
+                lat: 35.6740,
+                lng: 139.6480,
+                level: 1
+            },
+            {
+                id: 4,
+                name: "試練の塔",
+                desc: "強力なボスが待ち受ける",
+                reward: "レジェンダリー装備",
+                lat: 35.6795,
+                lng: 139.6550,
+                level: 5
+            }
+        ];
+        
+        // クエスト完了状態
+        let completedQuests = JSON.parse(localStorage.getItem('completedQuests')) || {};
+        
+        // クエストマーカーの作成
+        const questMarkers = {};
+        quests.forEach(quest => {
+            const icon = L.divIcon({
+                className: 'custom-icon',
+                html: `<div class="quest-marker ${completedQuests[quest.id] ? 'completed' : ''}">${quest.level}</div>`,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -20]
+            });
+            
+            const marker = L.marker([quest.lat, quest.lng], { icon }).addTo(map);
+            
+            marker.bindPopup(`
+                <div class="quest-popup">
+                    <div class="quest-title">${quest.name}</div>
+                    <div class="quest-desc">${quest.desc}</div>
+                    <div class="quest-reward">報酬: ${quest.reward}</div>
+                    <div class="quest-distance" id="distance-${quest.id}">距離: 計測中...</div>
+                </div>
+            `);
+            
+            questMarkers[quest.id] = marker;
+        });
+        
+        // 位置情報の取得と更新
+        function startLocationTracking() {
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        updatePlayerLocation(position.coords.latitude, position.coords.longitude);
+                    },
+                    (error) => {
+                        console.error("位置情報エラー:", error);
+                        // デモ用のシミュレート位置
+                        simulatePlayerMovement();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                // 位置情報が使えない場合はシミュレート
+                simulatePlayerMovement();
+            }
+        }
+        
+        // プレイヤー位置の更新
+        function updatePlayerLocation(lat, lng) {
+            playerLocation = { lat, lng };
+            
+            if (!playerMarker) {
+                const icon = L.divIcon({
+                    className: 'custom-icon',
+                    html: '<div class="player-marker"></div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+                playerMarker = L.marker([lat, lng], { icon }).addTo(map);
+            } else {
+                playerMarker.setLatLng([lat, lng]);
+            }
+            
+            // 近くのクエストをチェック
+            checkNearbyQuests();
+            updateDistances();
+        }
+        
+        // 距離計算
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371e3; // 地球の半径（メートル）
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lng2-lng1) * Math.PI/180;
+            
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+        
+        // 距離の更新
+        function updateDistances() {
+            if (!playerLocation) return;
+            
+            let nearestQuest = null;
+            let nearestDistance = Infinity;
+            
+            quests.forEach(quest => {
+                const distance = calculateDistance(
+                    playerLocation.lat, playerLocation.lng,
+                    quest.lat, quest.lng
+                );
+                
+                // ポップアップ内の距離を更新
+                const distanceEl = document.getElementById(`distance-${quest.id}`);
+                if (distanceEl) {
+                    distanceEl.textContent = `距離: ${formatDistance(distance)}`;
+                }
+                
+                if (distance < nearestDistance && !completedQuests[quest.id]) {
+                    nearestDistance = distance;
+                    nearestQuest = quest;
+                }
+            });
+            
+            // 最寄りのクエスト情報を更新
+            if (nearestQuest) {
+                document.getElementById('nearestDistance').textContent = formatDistance(nearestDistance);
+                document.getElementById('nearestQuest').textContent = nearestQuest.name;
+            }
+        }
+        
+        // 距離のフォーマット
+        function formatDistance(meters) {
+            if (meters < 1000) {
+                return `${Math.round(meters)}m`;
+            } else {
+                return `${(meters / 1000).toFixed(1)}km`;
+            }
+        }
+        
+        // 近くのクエストをチェック（50m以内でクリア可能）
+        function checkNearbyQuests() {
+            if (!playerLocation) return;
+            
+            quests.forEach(quest => {
+                if (completedQuests[quest.id]) return;
+                
+                const distance = calculateDistance(
+                    playerLocation.lat, playerLocation.lng,
+                    quest.lat, quest.lng
+                );
+                
+                if (distance < 50) { // 50m以内
+                    completeQuest(quest);
+                }
+            });
+        }
+        
+        // クエスト完了
+        function completeQuest(quest) {
+            completedQuests[quest.id] = true;
+            localStorage.setItem('completedQuests', JSON.stringify(completedQuests));
+            
+            // マーカーを更新
+            const icon = L.divIcon({
+                className: 'custom-icon',
+                html: `<div class="quest-marker completed">${quest.level}</div>`,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -20]
+            });
+            questMarkers[quest.id].setIcon(icon);
+            
+            // 完了通知
+            alert(`クエスト「${quest.name}」をクリア！\n${quest.reward}`);
+        }
+        
+        // モード切り替え
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(mode));
+            });
+            
+            document.getElementById('arOverlay').classList.toggle('active', mode === 'ar');
+            
+            if (mode === 'ar') {
+                startCompass();
+            }
+        }
+        
+        // コンパス機能（ARモード用）
+        function startCompass() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', (event) => {
+                    const heading = event.alpha;
+                    document.getElementById('compassHeading').textContent = Math.round(heading);
+                });
+            }
+        }
+        
+        // デモ用：プレイヤーの動きをシミュレート
+        function simulatePlayerMovement() {
+            let lat = 35.6762;
+            let lng = 139.6503;
+            
+            setInterval(() => {
+                lat += (Math.random() - 0.5) * 0.0002;
+                lng += (Math.random() - 0.5) * 0.0002;
+                updatePlayerLocation(lat, lng);
+            }, 3000);
+        }
+        
+        // 初期化
+        startLocationTracking();
+        
+        // 地図をプレイヤー位置に中心を合わせる
+        setInterval(() => {
+            if (playerLocation && currentMode === 'map') {
+                map.panTo([playerLocation.lat, playerLocation.lng]);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
