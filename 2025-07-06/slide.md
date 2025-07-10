@@ -81,8 +81,7 @@ https://drive.google.com/drive/folders/1mpv-9r0SVznrseM16jQox6dWk6aayStv?usp=sha
 
 # 自己紹介
 
---- 
-
+---
 <img src="./assets/profile.jpg" class="round-icon">
 
 講師紹介 : 田中
