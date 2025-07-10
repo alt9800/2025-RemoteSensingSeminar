@@ -82,6 +82,7 @@ https://drive.google.com/drive/folders/1mpv-9r0SVznrseM16jQox6dWk6aayStv?usp=sha
 # 自己紹介
 
 --- 
+
 <img src="./assets/profile.jpg" class="round-icon">
 
 講師紹介 : 田中
@@ -535,3 +536,19 @@ MapLibreは、基本的にWeb Mercatorに最適化されており、他の投影
 
 Leafletでは、project()とunproject()メソッドで地理座標とピクセル座標の相互変換が簡単に行えます。また、異なるズームレベルでの変換も柔軟に対応できます。
 MapLibreでは、project()とunproject()メソッドも提供されていますが、主にマップボックスのベクトルタイル仕様に最適化された実装となっています。
+
+
+---
+
+## Leafletのとても良い使い方
+
+クラスター表示を行う (これもMapLibreだと少し楽かも)
+
+[Leaflet.markercluster | Marker Clustering plugin for Leaflet](https://leaflet.github.io/Leaflet.markercluster/)
+
+---
+
+新党・チームみらい【公式】 @team_mirai_jp
+https://x.com/team_mirai_jp/status/1942617325930439140
+
+<blockquote class="twitter-tweet"><p lang="ja" dir="ltr">ポスターマップ、実際に操作してみた画面の動画はこちら🗺️<br>地図上で掲示板の場所を選んで、ポスターを貼ったことを報告していただくと、画面上の灰色のマークが緑色に変わります💚<a href="https://t.co/dh26HWN9ze">https://t.co/dh26HWN9ze</a><a href="https://twitter.com/hashtag/%E3%83%81%E3%83%BC%E3%83%A0%E3%81%BF%E3%82%89%E3%81%84?src=hash&amp;ref_src=twsrc%5Etfw">#チームみらい</a> <a href="https://twitter.com/hashtag/%E3%81%BF%E3%82%89%E3%81%84%E3%82%92%E9%81%B8%E3%81%BC%E3%81%86?src=hash&amp;ref_src=twsrc%5Etfw">#みらいを選ぼう</a> <a href="https://t.co/Z7JB2tuiA9">pic.twitter.com/Z7JB2tuiA9</a></p>&mdash; 新党・チームみらい【公式】 (@team_mirai_jp) <a href="https://twitter.com/team_mirai_jp/status/1942617325930439140?ref_src=twsrc%5Etfw">July 8, 2025</a></blockquote> 
