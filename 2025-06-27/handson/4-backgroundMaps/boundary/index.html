@@ -146,6 +146,30 @@
             background: #218838;
         }
         
+        .attribution {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 3px 6px;
+            font-size: 11px;
+            color: #333;
+            border-radius: 3px;
+            max-width: 300px;
+            text-align: right;
+            z-index: 1000;
+            backdrop-filter: blur(3px);
+        }
+        
+        .attribution a {
+            color: #007cba;
+            text-decoration: none;
+        }
+        
+        .attribution a:hover {
+            text-decoration: underline;
+        }
+        
         .style-selector {
             margin-top: 15px;
             padding-top: 15px;
@@ -191,18 +215,15 @@
             <h4>🎨 マップスタイル</h4>
             <select id="style-selector">
                 <option value="osm">OpenStreetMap</option>
-                <option value="osm-humanitarian">人道支援スタイル</option>
-                <option value="cartodb-positron">CartoDB Positron</option>
-                <option value="cartodb-dark">CartoDB Dark</option>
-                <option value="stamen-toner">Stamen Toner</option>
-                <option value="stamen-terrain">Stamen Terrain</option>
-                <option value="wikimedia">Wikimedia</option>
+                <option value="gsi-std">地理院地図（標準）</option>
+                <option value="gsi-pale">地理院地図（淡色）</option>
+                <option value="gsi-ort">地理院地図（写真）</option>
                 <option value="esri-world-imagery">衛星画像 (Esri)</option>
             </select>
         </div>
     </div>
     
-    <button id="info-button" class="info-button">ℹ️</button>
+    <div id="attribution" class="attribution">© OpenStreetMap contributors</div>
     
     <div id="info-modal" class="modal">
         <div class="modal-content">
@@ -237,22 +258,27 @@
             'osm': {
                 name: 'OpenStreetMap',
                 url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                attribution: '© OpenStreetMap contributors'
+                attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
             },
-            'stamen-toner': {
-                name: 'Stamen Toner',
-                url: 'https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}.png',
-                attribution: '© Stamen Design, © OpenStreetMap contributors'
+            'gsi-std': {
+                name: '地理院地図（標準）',
+                url: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+                attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>'
             },
-            'stamen-terrain': {
-                name: 'Stamen Terrain',
-                url: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png',
-                attribution: '© Stamen Design, © OpenStreetMap contributors'
+            'gsi-pale': {
+                name: '地理院地図（淡色）',
+                url: 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',
+                attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>'
+            },
+            'gsi-ort': {
+                name: '地理院地図（写真）',
+                url: 'https://cyberjapandata.gsi.go.jp/xyz/ort/{z}/{x}/{y}.jpg',
+                attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>'
             },
             'esri-world-imagery': {
                 name: 'Esri World Imagery',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                attribution: '© Esri, © OpenStreetMap contributors'
+                attribution: '© <a href="https://www.esri.com/">Esri</a>, © <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
             }
         };
 
@@ -286,10 +312,10 @@
         const latElement = document.getElementById('latitude');
         const lngElement = document.getElementById('longitude');
         const toggleButton = document.getElementById('toggle-tiles');
-        const infoButton = document.getElementById('info-button');
         const modal = document.getElementById('info-modal');
         const closeButton = document.querySelector('.close');
         const styleSelector = document.getElementById('style-selector');
+        const attributionElement = document.getElementById('attribution');
         
         let tilesVisible = false;
         let currentStyle = 'osm';
@@ -323,7 +349,9 @@
             // ソースを更新
             map.getSource('current-tiles').setTiles([service.url]);
             
-            // アトリビューションを更新（可能な場合）
+            // アトリビューションを更新
+            attributionElement.innerHTML = service.attribution;
+            
             currentStyle = styleId;
             
             // タイル境界を再表示
@@ -470,12 +498,7 @@
             document.getElementById('modal-source').textContent = tileServices[e.target.value].name;
         });
 
-        // モーダル制御
-        infoButton.addEventListener('click', () => {
-            updateInfo(); // モーダルを開く前に情報を更新
-            modal.style.display = 'block';
-        });
-
+        // モーダル制御（情報ボタンのクリックは削除）
         closeButton.addEventListener('click', () => {
             modal.style.display = 'none';
         });
@@ -484,6 +507,13 @@
             if (event.target === modal) {
                 modal.style.display = 'none';
             }
+        });
+
+        // ダブルクリックでモーダル表示（情報ボタンの代替）
+        map.on('dblclick', (e) => {
+            e.preventDefault(); // ズームを防ぐ
+            updateInfo();
+            modal.style.display = 'block';
         });
 
         // ナビゲーションコントロールの追加
