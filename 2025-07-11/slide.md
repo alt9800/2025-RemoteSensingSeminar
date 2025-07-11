@@ -223,7 +223,51 @@ DuckDBについて
 (クッキーやセッションストレージについて)
 
 
+---
+
+## CSVを読み込みたい
+CSV形式からデータを取り出す / ローカルで読み込む
+
+設計においてlat long を分けるか否か
+ジオメトリの形式にした方が取り回しはしやすいかも
+住所しかデータがない場合
+CSISで一括変換するのもいいかも
+https://geocode.csis.u-tokyo.ac.jp/geocode-cgi/geocode.cgi?action=start
 
 
 
+---
+
+GeoJSONから読み込みたい
+筆ポリゴンの例
+https://www.maff.go.jp/j/tokei/porigon/index.html
+(リンク https://open.fude.maff.go.jp)
+筆ポリゴンの利用規約
+https://opendata.fude.maff.go.jp/筆ポリゴンの利用規約.pdf
+
+筆ポリゴンからダウンロードするデータはGeoJSONにリネームする必要がある
+
+
+---
+
+任意のGeoJSONを作りたい
+
+
+---
+
+
+とりあえずどんなデータか見てみたい
+https://kepler.gl
+
+試しに筆ポリゴンのデータを読み込ませてみましょう
+
+
+---
+
+こういう形式を知っておくと良いかも
+
+* Geoparquet
+* 3D tiles
+* COG
+* FlatGeoBuff
 
