@@ -3,6 +3,8 @@
 let map;
 let markers = [];
 let selectedLocation = null;
+let selectedPostId = null;
+let isMarkerClick = false;
 
 // 地図スタイルの定義
 const mapStyles = {
@@ -84,6 +86,12 @@ function initMap() {
 
     // 地図クリックイベント
     map.on('click', (e) => {
+        // マーカークリックの場合はスキップ
+        if (isMarkerClick) {
+            isMarkerClick = false;
+            return;
+        }
+
         const user = getUserInfo();
         if (!user) {
             if (confirm('投稿するにはログインが必要です。ログインページに移動しますか？')) {
@@ -203,7 +211,9 @@ function displayPosts(posts) {
     }
     
     postsList.innerHTML = posts.map(post => `
-        <div class="post-item" data-post-id="${post.id}" onclick="focusOnPost(${post.latitude}, ${post.longitude})">
+        <div class="post-item ${selectedPostId === post.id ? 'selected' : ''}" 
+             data-post-id="${post.id}" 
+             onclick="selectPost(${post.id}, ${post.latitude}, ${post.longitude})">
             <div class="post-header">
                 <span class="post-user">${post.username}</span>
                 <span class="post-date">${formatDate(post.created_at)}</span>
@@ -212,6 +222,26 @@ function displayPosts(posts) {
             ${post.image_url ? `<img src="${post.image_url}" alt="投稿画像" class="post-image">` : ''}
         </div>
     `).join('');
+}
+
+// 投稿を選択
+function selectPost(postId, lat, lng) {
+    selectedPostId = postId;
+    
+    // 選択状態のスタイルを更新
+    document.querySelectorAll('.post-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    document.querySelector(`[data-post-id="${postId}"]`)?.classList.add('selected');
+    
+    // 地図を移動
+    focusOnPost(lat, lng);
+    
+    // 対応するマーカーのポップアップを表示
+    const marker = markers.find(m => m.postId === postId);
+    if (marker && marker.getPopup()) {
+        marker.getPopup().addTo(map);
+    }
 }
 
 // 地図にマーカーを追加
@@ -223,27 +253,40 @@ function addMarkersToMap(posts) {
     posts.forEach(post => {
         // カスタムマーカー要素
         const el = document.createElement('div');
-        el.className = 'marker';
+        el.className = 'custom-marker';
         el.style.backgroundColor = post.is_owner ? '#2563eb' : '#ef4444';
-        el.style.width = '20px';
-        el.style.height = '20px';
+        el.style.width = '30px';
+        el.style.height = '30px';
         el.style.borderRadius = '50%';
         el.style.cursor = 'pointer';
+        el.style.border = '3px solid white';
+        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         
-        // ポップアップの内容
+        // サムネイル付きポップアップの内容
         const popupContent = `
             <div class="popup-content">
+                ${post.image_url ? `<img src="${post.image_url}" alt="投稿画像" class="popup-image">` : ''}
                 <div class="popup-user">${post.username}</div>
                 <div class="popup-date">${formatDate(post.created_at)}</div>
-                ${post.comment ? `<p>${escapeHtml(post.comment)}</p>` : ''}
+                ${post.comment ? `<p class="popup-comment">${escapeHtml(post.comment)}</p>` : ''}
             </div>
         `;
         
         // マーカーの作成
         const marker = new maplibregl.Marker(el)
             .setLngLat([post.longitude, post.latitude])
-            .setPopup(new maplibregl.Popup().setHTML(popupContent))
+            .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(popupContent))
             .addTo(map);
+        
+        // マーカーに投稿IDを追加
+        marker.postId = post.id;
+        
+        // マーカークリックイベント
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isMarkerClick = true;
+            selectPost(post.id, post.latitude, post.longitude);
+        });
         
         markers.push(marker);
     });
