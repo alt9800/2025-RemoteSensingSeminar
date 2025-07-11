@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>MapLibre GL JS - コントロール一覧</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .map-section {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map { 
+            width: 100%; 
+            height: 100%;
+        }
+        
+        .controls-panel {
+            width: 400px;
+            background: #f8f9fa;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            padding: 20px;
+            background: #007cba;
+            color: white;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .carousel-container {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .carousel {
+            display: flex;
+            transition: transform 0.3s ease;
+            height: 100%;
+        }
+        
+        .carousel-slide {
+            min-width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        
+        .carousel-nav {
+            display: flex;
+            justify-content: center;
+            padding: 15px;
+            background: #e9ecef;
+            gap: 10px;
+        }
+        
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .nav-dot.active {
+            background: #007cba;
+        }
+        
+        .control-section h2 {
+            color: #007cba;
+            margin-top: 0;
+            font-size: 20px;
+            border-bottom: 2px solid #007cba;
+            padding-bottom: 8px;
+        }
+        
+        .control-item {
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-item h3 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .control-item p {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: #007cba;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #005a87;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .code-example {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            border-left: 4px solid #007cba;
+            overflow-x: auto;
+            white-space: pre-line;
+            line-height: 1.4;
+        }
+        
+        .nav-arrows {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 124, 186, 0.8);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-prev {
+            left: 10px;
+        }
+        
+        .nav-next {
+            right: 10px;
+        }
+        
+        .nav-arrows:hover {
+            background: rgba(0, 90, 135, 0.9);
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        .nav-arrows:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .action-buttons button {
+            flex: 1;
+            min-width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-section">
+            <div id="map"></div>
+        </div>
+        
+        <div class="controls-panel">
+            <div class="header">
+                <h1>MapLibre コントロール</h1>
+            </div>
+            
+            <div class="carousel-container">
+                <div class="carousel" id="carousel">
+                    <!-- スライド1: NavigationControl -->
+                    <div class="carousel-slide">
+                        <div class="control-section">
+                            <h2>NavigationControl</h2>
+                            <div class="control-item">
+                                <h3>ナビゲーションコントロール</h3>
+                                <p>ズームイン/アウト、地図の回転、傾斜のリセット機能を提供します。地図操作の基本となるコントロールです。</p>
+                                <div class="action-buttons">
+                                    <button onclick="toggleNavigationControl()">ON/OFF</button>
+                                </div>
+                                <div class="code-example">// 基本的な追加
+map.addControl(new maplibregl.NavigationControl());
+
+// 位置指定
+map.addControl(
+  new maplibregl.NavigationControl(), 
+  'top-right'
+);</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- スライド2: ScaleControl -->
+                    <div class="carousel-slide">
+                        <div class="control-section">
+                            <h2>ScaleControl</h2>
+                            <div class="control-item">
+                                <h3>スケールコントロール</h3>
+                                <p>地図の縮尺（スケール）を表示します。距離の把握に便利です。</p>
+                                <div class="action-buttons">
+                                    <button onclick="toggleScaleControl()">ON/OFF</button>
+                                </div>
+                                <div class="code-example">// 基本的な追加
+map.addControl(new maplibregl.ScaleControl());
+
+// オプション付き
+map.addControl(new maplibregl.ScaleControl({
+  maxWidth: 100,
+  unit: 'metric' // 'imperial', 'nautical'も可能
+}), 'bottom-left');</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- スライド3: FullscreenControl -->
+                    <div class="carousel-slide">
+                        <div class="control-section">
+                            <h2>FullscreenControl</h2>
+                            <div class="control-item">
+                                <h3>フルスクリーンコントロール</h3>
+                                <p>地図をフルスクリーン表示します。詳細な地図閲覧に最適です。</p>
+                                <div class="action-buttons">
+                                    <button onclick="toggleFullscreenControl()">ON/OFF</button>
+                                </div>
+                                <div class="code-example">// フルスクリーンコントロールを追加
+map.addControl(new maplibregl.FullscreenControl());
+
+// 特定の要素をフルスクリーン対象に
+map.addControl(new maplibregl.FullscreenControl({
+  container: document.querySelector('#map-container')
+}));</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- スライド4: GeolocateControl -->
+                    <div class="carousel-slide">
+                        <div class="control-section">
+                            <h2>GeolocateControl</h2>
+                            <div class="control-item">
+                                <h3>位置情報コントロール</h3>
+                                <p>ユーザーの現在地を取得して地図上に表示します。位置情報の許可が必要です。</p>
+                                <div class="action-buttons">
+                                    <button onclick="toggleGeolocateControl()">ON/OFF</button>
+                                </div>
+                                <div class="code-example">// 基本的な位置情報コントロール
+map.addControl(new maplibregl.GeolocateControl());
+
+// 詳細オプション付き
+map.addControl(new maplibregl.GeolocateControl({
+  positionOptions: {
+    enableHighAccuracy: true
+  },
+  trackUserLocation: true,
+  showUserHeading: true
+}));</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- スライド5: カスタムコントロール -->
+                    <div class="carousel-slide">
+                        <div class="control-section">
+                            <h2>カスタムコントロール</h2>
+                            <div class="control-item">
+                                <h3>独自コントロール</h3>
+                                <p>カスタム機能を持つ独自のコントロールを作成できます。このサンプルは東京駅に移動するボタンです。</p>
+                                <div class="action-buttons">
+                                    <button onclick="toggleCustomControl()">ON/OFF</button>
+                                </div>
+                                <div class="code-example">class CustomControl {
+  onAdd(map) {
+    this._map = map;
+    this._container = document.createElement('div');
+    this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    this._container.innerHTML = `
+      &lt;button type="button" title="東京駅へ"&gt;🏢&lt;/button&gt;
+    `;
+    this._container.onclick = () => {
+      map.flyTo({ center: [139.767, 35.681], zoom: 15 });
+    };
+    return this._container;
+  }
+  
+  onRemove() {
+    this._container.parentNode.removeChild(this._container);
+    this._map = undefined;
+  }
+}
+
+map.addControl(new CustomControl());</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- スライド6: 総合管理 -->
+                    <div class="carousel-slide">
+                        <div class="control-section">
+                            <h2>コントロール管理</h2>
+                            <div class="control-item">
+                                <h3>配置と削除</h3>
+                                <p>コントロールの配置位置を指定したり、不要になったコントロールを削除できます。</p>
+                                <div class="action-buttons">
+                                    <button onclick="addAllBasicControls()">全て追加</button>
+                                    <button onclick="removeAllControls()">全て削除</button>
+                                </div>
+                                <div class="code-example">// 配置位置の指定
+'top-left'      // 左上
+'top-right'     // 右上（デフォルト）
+'bottom-left'   // 左下  
+'bottom-right'  // 右下
+
+// コントロールの削除
+map.removeControl(navigationControl);
+
+// 推奨の基本セット
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+map.addControl(new maplibregl.FullscreenControl(), 'top-left');
+map.addControl(new maplibregl.GeolocateControl(), 'bottom-right');</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ナビゲーション矢印をここに移動 -->
+                <button class="nav-arrows nav-prev">‹</button>
+                <button class="nav-arrows nav-next">›</button>
+            </div>
+            
+            <div class="carousel-nav">
+                <div class="nav-dot active" onclick="goToSlide(0)"></div>
+                <div class="nav-dot" onclick="goToSlide(1)"></div>
+                <div class="nav-dot" onclick="goToSlide(2)"></div>
+                <div class="nav-dot" onclick="goToSlide(3)"></div>
+                <div class="nav-dot" onclick="goToSlide(4)"></div>
+                <div class="nav-dot" onclick="goToSlide(5)"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script>
+        // 地図の初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+            center: [139.7670, 35.6814],
+            zoom: 10
+        });
+
+        // コントロールの参照を保持
+        let navigationControl = null;
+        let scaleControl = null;
+        let fullscreenControl = null;
+        let geolocateControl = null;
+        let customControl = null;
+
+        // カルーセル関連
+        let currentSlide = 0;
+        const totalSlides = 6;
+
+        function updateCarousel() {
+            const carousel = document.getElementById('carousel');
+            carousel.style.transform = `translateX(-${currentSlide * 100}%)`;
+            
+            // ドットの更新
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+        }
+
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % totalSlides;
+            updateCarousel();
+        }
+
+        function prevSlide() {
+            currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+            updateCarousel();
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateCarousel();
+        }
+
+        // ナビゲーション矢印のイベントリスナーを追加
+        document.addEventListener('DOMContentLoaded', function() {
+            // 矢印ボタンにイベントリスナーを追加
+            const prevBtn = document.querySelector('.nav-prev');
+            const nextBtn = document.querySelector('.nav-next');
+            
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    prevSlide();
+                });
+            }
+            
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    nextSlide();
+                });
+            }
+        });
+
+        // NavigationControl の切り替え
+        function toggleNavigationControl() {
+            if (navigationControl) {
+                map.removeControl(navigationControl);
+                navigationControl = null;
+            } else {
+                navigationControl = new maplibregl.NavigationControl();
+                map.addControl(navigationControl, 'top-right');
+            }
+        }
+
+        // ScaleControl の切り替え
+        function toggleScaleControl() {
+            if (scaleControl) {
+                map.removeControl(scaleControl);
+                scaleControl = null;
+            } else {
+                scaleControl = new maplibregl.ScaleControl({
+                    maxWidth: 100,
+                    unit: 'metric'
+                });
+                map.addControl(scaleControl, 'bottom-left');
+            }
+        }
+
+        // FullscreenControl の切り替え（修正版）
+        function toggleFullscreenControl() {
+            if (fullscreenControl) {
+                map.removeControl(fullscreenControl);
+                fullscreenControl = null;
+            } else {
+                fullscreenControl = new maplibregl.FullscreenControl({
+                    container: document.querySelector('.map-section')
+                });
+                map.addControl(fullscreenControl, 'top-left');
+            }
+        }
+
+        // GeolocateControl の切り替え
+        function toggleGeolocateControl() {
+            if (geolocateControl) {
+                map.removeControl(geolocateControl);
+                geolocateControl = null;
+            } else {
+                geolocateControl = new maplibregl.GeolocateControl({
+                    positionOptions: {
+                        enableHighAccuracy: true
+                    },
+                    trackUserLocation: true,
+                    showUserHeading: true
+                });
+                map.addControl(geolocateControl, 'bottom-right');
+            }
+        }
+
+        // カスタムコントロールクラス
+        class CustomControl {
+            onAdd(map) {
+                this._map = map;
+                this._container = document.createElement('div');
+                this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+                this._container.innerHTML = `
+                    <button type="button" title="東京駅に移動" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 5px;">🏢</button>
+                `;
+                this._container.onclick = () => {
+                    map.flyTo({ 
+                        center: [139.7670, 35.6814], 
+                        zoom: 15,
+                        duration: 2000
+                    });
+                };
+                return this._container;
+            }
+            
+            onRemove() {
+                this._container.parentNode.removeChild(this._container);
+                this._map = undefined;
+            }
+        }
+
+        // カスタムコントロールの切り替え
+        function toggleCustomControl() {
+            if (customControl) {
+                map.removeControl(customControl);
+                customControl = null;
+            } else {
+                customControl = new CustomControl();
+                map.addControl(customControl, 'top-left');
+            }
+        }
+
+        // すべての基本コントロールを追加
+        function addAllBasicControls() {
+            removeAllControls();
+            
+            navigationControl = new maplibregl.NavigationControl();
+            map.addControl(navigationControl, 'top-right');
+            
+            scaleControl = new maplibregl.ScaleControl({ unit: 'metric' });
+            map.addControl(scaleControl, 'bottom-left');
+            
+            fullscreenControl = new maplibregl.FullscreenControl({
+                container: document.querySelector('.map-section')
+            });
+            map.addControl(fullscreenControl, 'top-left');
+            
+            geolocateControl = new maplibregl.GeolocateControl({
+                positionOptions: { enableHighAccuracy: true },
+                trackUserLocation: true,
+                showUserHeading: true
+            });
+            map.addControl(geolocateControl, 'bottom-right');
+        }
+
+        // すべてのコントロールを削除
+        function removeAllControls() {
+            if (navigationControl) {
+                map.removeControl(navigationControl);
+                navigationControl = null;
+            }
+            if (scaleControl) {
+                map.removeControl(scaleControl);
+                scaleControl = null;
+            }
+            if (fullscreenControl) {
+                map.removeControl(fullscreenControl);
+                fullscreenControl = null;
+            }
+            if (geolocateControl) {
+                map.removeControl(geolocateControl);
+                geolocateControl = null;
+            }
+            if (customControl) {
+                map.removeControl(customControl);
+                customControl = null;
+            }
+        }
+
+        // 初期状態で基本コントロールを追加
+        map.on('load', () => {
+            navigationControl = new maplibregl.NavigationControl();
+            map.addControl(navigationControl);
+        });
+
+        // キーボードナビゲーション
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                prevSlide();
+            } else if (e.key === 'ArrowRight') {
+                nextSlide();
+            }
+        });
+    </script>
+</body>
+</html>

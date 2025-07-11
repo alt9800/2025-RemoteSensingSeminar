@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道路陥没状況記録システム</title>
+    <script src="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+        .base-layer-control {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .photo-input {
+            display: none;
+        }
+        .popup-content {
+            max-width: 300px;
+        }
+        .popup-image {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+        .popup-info {
+            font-size: 14px;
+        }
+        .attribution {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: rgba(255,255,255,0.8);
+            padding: 5px;
+            font-size: 11px;
+            z-index: 999;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .record-count {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="controls">
+        <h3 style="margin: 0 0 10px 0;">陥没記録システム</h3>
+        <button id="addPointBtn">記録地点を追加</button>
+        <button id="exportBtn">データをエクスポート</button>
+        <button id="importBtn">データをインポート</button>
+        <input type="file" id="importFile" accept=".geojson" style="display: none;">
+        <button id="clearBtn" style="background: #dc3545;">データをクリア</button>
+        <div class="record-count">記録数: <span id="recordCount">0</span></div>
+    </div>
+    
+    <div class="base-layer-control">
+        <label>背景地図:</label>
+        <select id="baseLayerSelect">
+            <option value="osm">OpenStreetMap</option>
+            <option value="gsi-vector">地理院ベクター</option>
+            <option value="gsi-photo">地理院航空写真</option>
+        </select>
+    </div>
+    
+    <div class="attribution" id="attribution">
+        © OpenStreetMap contributors
+    </div>
+    
+    <input type="file" id="photoInput" class="photo-input" accept="image/*">
+
+    <script>
+        // IndexedDBの初期化
+        let db;
+        const DB_NAME = 'PotholeDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'potholes';
+        
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                        store.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                };
+            });
+        }
+        
+        // データの保存
+        async function saveRecord(record) {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            return store.put(record);
+        }
+        
+        // データの読み込み
+        async function loadRecords() {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // データのクリア
+        async function clearRecords() {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            return store.clear();
+        }
+        
+        // 地図の初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+            center: [139.7, 35.7],
+            zoom: 10,
+            attributionControl: false
+        });
+        
+        // ナビゲーションコントロール追加
+        map.addControl(new maplibregl.NavigationControl());
+        
+        // 現在位置取得コントロール
+        map.addControl(new maplibregl.GeolocateControl({
+            positionOptions: {
+                enableHighAccuracy: true
+            },
+            trackUserLocation: true
+        }));
+        
+        // データソースとレイヤーの追加
+        map.on('load', async () => {
+            await initDB();
+            
+            // 空のGeoJSONソースを追加
+            map.addSource('potholes', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: []
+                }
+            });
+            
+            // ポイントレイヤー
+            map.addLayer({
+                id: 'pothole-points',
+                type: 'circle',
+                source: 'potholes',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#ff0000',
+                    'circle-stroke-color': '#ffffff',
+                    'circle-stroke-width': 2
+                }
+            });
+            
+            // 既存データの読み込み
+            await loadExistingData();
+        });
+        
+        // 既存データの読み込みと表示
+        async function loadExistingData() {
+            const records = await loadRecords();
+            const features = records.map(record => ({
+                type: 'Feature',
+                id: record.id,
+                geometry: {
+                    type: 'Point',
+                    coordinates: record.coordinates
+                },
+                properties: {
+                    id: record.id,
+                    timestamp: record.timestamp,
+                    description: record.description,
+                    hasImage: !!record.imageBlob
+                }
+            }));
+            
+            map.getSource('potholes').setData({
+                type: 'FeatureCollection',
+                features: features
+            });
+            
+            updateRecordCount(features.length);
+        }
+        
+        // 記録数の更新
+        function updateRecordCount(count) {
+            document.getElementById('recordCount').textContent = count;
+        }
+        
+        // ポップアップの設定
+        map.on('click', 'pothole-points', async (e) => {
+            const feature = e.features[0];
+            const records = await loadRecords();
+            const record = records.find(r => r.id === feature.properties.id);
+            
+            if (record) {
+                let popupContent = '<div class="popup-content">';
+                
+                if (record.imageBlob) {
+                    const imageUrl = URL.createObjectURL(record.imageBlob);
+                    popupContent += `<img src="${imageUrl}" class="popup-image" alt="陥没画像">`;
+                }
+                
+                popupContent += `
+                    <div class="popup-info">
+                        <strong>記録日時:</strong><br>
+                        ${new Date(record.timestamp).toLocaleString('ja-JP')}<br>
+                        <strong>説明:</strong><br>
+                        ${record.description || '説明なし'}
+                    </div>
+                </div>`;
+                
+                new maplibregl.Popup()
+                    .setLngLat(record.coordinates)
+                    .setHTML(popupContent)
+                    .addTo(map);
+            }
+        });
+        
+        // マウスカーソルの変更
+        map.on('mouseenter', 'pothole-points', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        
+        map.on('mouseleave', 'pothole-points', () => {
+            map.getCanvas().style.cursor = '';
+        });
+        
+        // 記録地点追加
+        let isAddingPoint = false;
+        document.getElementById('addPointBtn').addEventListener('click', () => {
+            isAddingPoint = true;
+            map.getCanvas().style.cursor = 'crosshair';
+            alert('地図上をクリックして記録地点を選択してください');
+        });
+        
+        // 地図クリックで地点追加
+        map.on('click', async (e) => {
+            if (!isAddingPoint) return;
+            
+            isAddingPoint = false;
+            map.getCanvas().style.cursor = '';
+            
+            const coordinates = [e.lngLat.lng, e.lngLat.lat];
+            
+            // 写真を選択
+            document.getElementById('photoInput').click();
+            
+            document.getElementById('photoInput').onchange = async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const description = prompt('陥没の説明を入力してください（任意）:');
+                
+                // レコードの作成
+                const record = {
+                    id: Date.now().toString(),
+                    coordinates: coordinates,
+                    timestamp: new Date().toISOString(),
+                    description: description || '',
+                    imageBlob: file
+                };
+                
+                // IndexedDBに保存
+                await saveRecord(record);
+                
+                // 地図に追加
+                const features = map.getSource('potholes')._data.features;
+                features.push({
+                    type: 'Feature',
+                    id: record.id,
+                    geometry: {
+                        type: 'Point',
+                        coordinates: coordinates
+                    },
+                    properties: {
+                        id: record.id,
+                        timestamp: record.timestamp,
+                        description: record.description,
+                        hasImage: true
+                    }
+                });
+                
+                map.getSource('potholes').setData({
+                    type: 'FeatureCollection',
+                    features: features
+                });
+                
+                updateRecordCount(features.length);
+                
+                // 入力をリセット
+                event.target.value = '';
+            };
+        });
+        
+        // データエクスポート（画像はBase64として含める）
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            const records = await loadRecords();
+            const features = [];
+            
+            for (const record of records) {
+                let imageData = null;
+                if (record.imageBlob) {
+                    const reader = new FileReader();
+                    imageData = await new Promise((resolve) => {
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(record.imageBlob);
+                    });
+                }
+                
+                features.push({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: record.coordinates
+                    },
+                    properties: {
+                        id: record.id,
+                        timestamp: record.timestamp,
+                        description: record.description,
+                        image: imageData
+                    }
+                });
+            }
+            
+            const geojson = {
+                type: 'FeatureCollection',
+                features: features
+            };
+            
+            const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `potholes_${new Date().toISOString().split('T')[0]}.geojson`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        
+        // データインポート
+        document.getElementById('importBtn').addEventListener('click', () => {
+            document.getElementById('importFile').click();
+        });
+        
+        document.getElementById('importFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const text = await file.text();
+            const geojson = JSON.parse(text);
+            
+            // 既存データをクリア
+            await clearRecords();
+            
+            // 新しいデータを保存
+            for (const feature of geojson.features) {
+                const props = feature.properties;
+                let imageBlob = null;
+                
+                if (props.image) {
+                    // Base64からBlobに変換
+                    const response = await fetch(props.image);
+                    imageBlob = await response.blob();
+                }
+                
+                const record = {
+                    id: props.id || Date.now().toString(),
+                    coordinates: feature.geometry.coordinates,
+                    timestamp: props.timestamp || new Date().toISOString(),
+                    description: props.description || '',
+                    imageBlob: imageBlob
+                };
+                
+                await saveRecord(record);
+            }
+            
+            // 地図を更新
+            await loadExistingData();
+            alert('データをインポートしました');
+            
+            // 入力をリセット
+            e.target.value = '';
+        });
+        
+        // データクリア
+        document.getElementById('clearBtn').addEventListener('click', async () => {
+            if (confirm('すべてのデータを削除しますか？この操作は取り消せません。')) {
+                await clearRecords();
+                map.getSource('potholes').setData({
+                    type: 'FeatureCollection',
+                    features: []
+                });
+                updateRecordCount(0);
+                alert('データをクリアしました');
+            }
+        });
+        
+        // 背景地図の切り替え
+        const baseLayerSelect = document.getElementById('baseLayerSelect');
+        const attribution = document.getElementById('attribution');
+        
+        const baseLayers = {
+            'osm': {
+                style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+                attribution: '© OpenStreetMap contributors'
+            },
+            'gsi-vector': {
+                style: {
+                    version: 8,
+                    sources: {
+                        'gsi-vector': {
+                            type: 'vector',
+                            tiles: ['https://cyberjapandata.gsi.go.jp/xyz/experimental_bvmap/{z}/{x}/{y}.pbf'],
+                            minzoom: 4,
+                            maxzoom: 16,
+                            attribution: '© 国土地理院'
+                        }
+                    },
+                    layers: [
+                        {
+                            id: 'background',
+                            type: 'background',
+                            paint: {
+                                'background-color': '#f0f0f0'
+                            }
+                        },
+                        {
+                            id: 'water',
+                            type: 'fill',
+                            source: 'gsi-vector',
+                            'source-layer': 'waterarea',
+                            paint: {
+                                'fill-color': '#a0c8f0'
+                            }
+                        },
+                        {
+                            id: 'road',
+                            type: 'line',
+                            source: 'gsi-vector',
+                            'source-layer': 'road',
+                            paint: {
+                                'line-color': '#ffffff',
+                                'line-width': 2
+                            }
+                        }
+                    ]
+                },
+                attribution: '© 国土地理院'
+            },
+            'gsi-photo': {
+                style: {
+                    version: 8,
+                    sources: {
+                        'gsi-photo': {
+                            type: 'raster',
+                            tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+                            tileSize: 256,
+                            attribution: '© 国土地理院'
+                        }
+                    },
+                    layers: [
+                        {
+                            id: 'gsi-photo-layer',
+                            type: 'raster',
+                            source: 'gsi-photo',
+                            minzoom: 0,
+                            maxzoom: 18
+                        }
+                    ]
+                },
+                attribution: '© 国土地理院'
+            }
+        };
+        
+        baseLayerSelect.addEventListener('change', async (e) => {
+            const selectedLayer = baseLayers[e.target.value];
+            
+            // 現在の中心座標とズームレベルを保存
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            
+            // 既存のpotholesデータを保存
+            const currentData = map.getSource('potholes')._data;
+            
+            // スタイルを変更
+            map.setStyle(selectedLayer.style);
+            
+            // スタイル変更後にレイヤーとソースを再追加
+            map.once('style.load', () => {
+                // データソースを再追加
+                map.addSource('potholes', {
+                    type: 'geojson',
+                    data: currentData
+                });
+                
+                // レイヤーを再追加
+                map.addLayer({
+                    id: 'pothole-points',
+                    type: 'circle',
+                    source: 'potholes',
+                    paint: {
+                        'circle-radius': 8,
+                        'circle-color': '#ff0000',
+                        'circle-stroke-color': '#ffffff',
+                        'circle-stroke-width': 2
+                    }
+                });
+                
+                // 位置を復元
+                map.setCenter(center);
+                map.setZoom(zoom);
+            });
+            
+            // アトリビューションを更新
+            attribution.textContent = selectedLayer.attribution;
+        });
+    </script>
+</body>
+</html>
