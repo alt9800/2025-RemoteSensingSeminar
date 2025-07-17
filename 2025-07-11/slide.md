@@ -127,27 +127,34 @@ https://project-4415519406887009516.web.app
 # 第六回までで完成する予定のアプリの外観
 
 ---
+非ログイン時
 
-![alt text](assets/image2.png)
-
-
----
-
-![alt text](assets/image1.png)
+![w:1000](assets/image2.png)
 
 
 ---
 
-![alt text](assets/image3.png)
+非ログイン時
 
-![alt text](assets/image6.png)
+![w:1000](assets/image1.png)
+
 
 ---
 
-![alt text](assets/image4.png)
+![bg](assets/image3.png)
 
-![alt text](assets/image5.png)
+![bg](assets/image6.png)
 
+---
+データ追加
+
+![w:400](assets/image4.png)
+
+
+
+![bg right w:700](assets/image5.png)
+
+---
 
 ログの例1
 
@@ -676,6 +683,11 @@ deck.glとMapLibreGL JSのGIS・3Dライブラリに、Loaders.jsなどを組み
 
 ---
 
+
+![alt text](assets/image10.png)
+
+---
+
 ### Q.任意のGeoJSONを作りたい
 
 ### A Geojson.io が良いかも
@@ -684,6 +696,50 @@ https://geojson.io/
 
 Mapbox社が提供しているWebアプリケーションで、
 点を打ったりラインやポリゴンを描いたものをGeoJSON形式で保存できます。
+また、簡易的なビューワとしても使えます。
+
+
+
+---
+
+# MapLibre補足
+
+---
+
+### 講義中に見たサンプルいろいろ
+[MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/)
+
+[マーカーの追加](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-default-marker/)
+
+
+[マーカーにホバーをつけたい](https://maplibre.org/maplibre-gl-js/docs/examples/display-a-popup-on-hover/)
+
+[ラインを引きたい](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-geojson-line/)
+
+[ポリゴンを表現したい](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-geojson-polygon/)
+
+[GeoJSONを読み込む例も公式にサンプルがあります](https://maplibre.org/maplibre-gl-js/docs/examples/view-local-geojson/)
+
+
+[アニメーションを行いたい](https://maplibre.org/maplibre-gl-js/docs/examples/animate-a-line/)
+
+[地形を表したい](https://maplibre.org/maplibre-gl-js/docs/examples/3d-terrain/)
+
+
+[ヒートマップを作りたい](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-heatmap-layer/)
+
+[ポイントクラスターをつくりたい](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+
+
+---
+
+### 参考リンク
+
+
+
+[ArcGIS で Cloud Optimized GeoTIFF (COG) を触ってみる - フリーダムの日記](https://freedom-tech.hatenablog.com/entry/2023/08/20/210800)
+
+[MapLibre GL JS+標高タイルで3D地形を表示する方法 #JavaScript - Qiita](https://qiita.com/shi-works/items/2d712456ccc91320cd1d)
 
 
 ---
@@ -700,20 +756,7 @@ Mapbox社が提供しているWebアプリケーションで、
 
 ---
 
-講義中に見たものいろいろ
-
-
-
----
-
-[MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/)
-
-[ArcGIS で Cloud Optimized GeoTIFF (COG) を触ってみる - フリーダムの日記](https://freedom-tech.hatenablog.com/entry/2023/08/20/210800)
-
-[MapLibre GL JS+標高タイルで3D地形を表示する方法 #JavaScript - Qiita](https://qiita.com/shi-works/items/2d712456ccc91320cd1d)
-
-
-
+# 実行環境公開のサポート
 
 ---
 
@@ -724,11 +767,17 @@ https://code.visualstudio.com/updates/v1_82#_workbench
 
 
 ---
-
+ctrl + @ などで下部のコンソールを開いき、「ポートの転送」をおこないます。
 ![alt text](assets/image7.png)
+
+---
+GitHub等にログイン状態で、現在サーバーが動いているポートを指定すると外部公開が始まります。
 
 ![alt text](assets/image8.png)
 
+---
+「転送されたアドレス」の欄から転送を解除できる他、この項目に表示されるアドレスを共有することで、他のユーザがローカルホストで表示されている項目にアクセスできるようになります。
+また、公開や非公開の範囲も設定できます。
 ![alt text](assets/image9.png)
 
 
@@ -737,8 +786,8 @@ https://code.visualstudio.com/updates/v1_82#_workbench
 ### 似た様なVSCodeの拡張機能
 
 ### LiveShare 
-自身のVSCodeをインターネットに公開して、同時にファイルなどを編集する。
+自身のVSCodeをインターネットに公開して、同時にファイルなどを編集できます。
 (要Macrosoft or GitHubアカウント)
 
 ### リモートトンネル 
-(sshなどを使って)自分のPC内のCLIやVSCodeにクラウド経由で外部から接続してもらう。
+(sshなどを使って)自分のPC内のCLIやVSCodeにクラウド経由で外部から接続してもらうことができます。
