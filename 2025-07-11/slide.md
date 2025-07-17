@@ -323,18 +323,79 @@ C# のASP / JavaのSpring / Ruby on Rails / PHPのLaravel などもMVCのアー�
 
 ---
 
-[IndexedDBをつかう](./pseudo-DB/useIndexedDB/)
+## [IndexedDB](./pseudo-DB/useIndexedDB/)
+
+この様な感じでデータが格納されます。
+```json
+{id: "1752792726584", coordinates: [139.70377655029148, 35.728154509073775], timestamp: "2025-07-17T22:52:06.584Z", description: "test", imageBlob: File}
+```
+
+また、実体としては
+```
+~/Library/Safari/Databases/
+~/Library/Application Support/Google/Chrome/Default/IndexedDB/
+```
+などローカルにデータベースが存在している格好です。
 
 
 ---
 
-[ローカルストレージを使う](./pseudo-DB/useLocalStorage/)
+ファイル構造については
+```
+
+DBのドメイン/
+  ├── .metadata
+  ├── database.sqlite  # メタデータ
+  └── 1/              # 実際のデータファイル
+      ├── 00001.blob
+      └── 00002.blob
+```
+の様になっていて、KV型のNoSQLとして振る舞います。
+
+
+容量も大きく、ご利用のマシンの空き容量次第で、GB級のストレージをつくることも可能です。
 
 
 ---
 
-[DuckDBを使う](./pseudo-DB/useDuckDB/)
+一般のキーバリューストアと同様に、リレーショナルの様な挙動をさせることや、外部キーもどきをつかったり、joinの様な挙動を行ったりすることもできます。
 
+この辺りは**LocalStorage**だけでは叶えられないポイントでもあります。
+
+
+
+
+---
+
+##  [LocalStorage](./pseudo-DB/useLocalStorage/)
+
+
+---
+
+LocalStorageはブラウザにもよりますが、保存領域は*オリジンごとに*5MB~10MBです。
+
+IndexedDBであっても、Localstorageであっても、「Cookieとサイトデータ削除」すると、すべてのデータが削除されます。
+
+IndexedDBは永続化(ロック)のような仕組みもある。
+
+---
+
+### ちなみに
+
+SessionStorage : タブを開いている間有効になる保存領域(フォームの中途入力など)
+
+Cache : オフライン時に利用するデータなど (Service Workerdで活用される) 実体はキャッシュディレクトリ内にファイルがあります。
+
+Cookie : サーバーと連携するための小さなテキストデータの保持領域
+
+---
+
+##  [DuckDB](./pseudo-DB/useDuckDB/)
+
+
+---
+
+SQLの実行などもできる
 
 ---
 
@@ -342,9 +403,6 @@ C# のASP / JavaのSpring / Ruby on Rails / PHPのLaravel などもMVCのアー�
 [Node.jsを使ってファイル書き込みをするパターン](./pseudo-DB/useNodejs/)
 
 
----
-
-(クッキーやセッションストレージについて)
 
 
 ---

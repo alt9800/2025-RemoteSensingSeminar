@@ -3,146 +3,446 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>道路陥没記録（DuckDB WASM版）</title>
+    <title>作物育成記録システム</title>
     <script src="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-blocking.js"></script>
     <style>
         body { margin: 0; font-family: Arial, sans-serif; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
         
-        .panel {
+        .main-panel {
             position: absolute;
             top: 10px;
             left: 10px;
             background: white;
             padding: 15px;
-            border-radius: 4px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            max-width: 280px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         
-        h3 { margin: 0 0 10px 0; font-size: 16px; }
+        h3 { 
+            margin: 0 0 15px 0; 
+            color: #2c5530;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
         
         button {
-            padding: 8px 16px;
+            padding: 10px 16px;
             margin: 4px 2px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            transition: all 0.2s;
         }
         
-        .add { background: #007bff; color: white; }
-        .export { background: #28a745; color: white; }
-        .query { background: #17a2b8; color: white; }
-        .clear { background: #dc3545; color: white; }
-        button:hover { opacity: 0.8; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { 
+            background: #28a745; 
+            color: white; 
+        }
+        .btn-primary:hover { 
+            background: #218838; 
+        }
         
-        .info { 
-            font-size: 12px; 
-            margin-top: 10px; 
-            padding: 8px;
-            background: #f8f9fa;
-            border-radius: 3px;
+        .btn-secondary { 
+            background: #6c757d; 
+            color: white; 
+        }
+        
+        .btn-danger { 
+            background: #dc3545; 
+            color: white; 
+        }
+        
+        .btn-info {
+            background: #17a2b8;
+            color: white;
         }
         
         .status {
             margin-top: 10px;
-            padding: 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            display: none;
-        }
-        .status.success { background: #d4edda; color: #155724; }
-        .status.error { background: #f8d7da; color: #721c24; }
-        .status.loading { background: #cce5ff; color: #004085; }
-        
-        .popup { font-size: 12px; }
-        .popup button { 
-            margin-top: 5px; 
-            padding: 4px 8px; 
-            font-size: 11px; 
-        }
-        
-        .query-panel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: white;
-            padding: 15px;
+            padding: 10px;
             border-radius: 4px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            max-width: 300px;
+            font-size: 13px;
             display: none;
         }
         
-        textarea {
-            width: 100%;
-            height: 80px;
-            margin: 5px 0;
-            padding: 5px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-family: monospace;
-            font-size: 12px;
+        .status.success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb;
         }
         
-        .query-result {
-            margin-top: 10px;
+        .status.error { 
+            background: #f8d7da; 
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .storage-info {
+            margin-top: 15px;
             padding: 10px;
             background: #f8f9fa;
-            border-radius: 3px;
+            border-radius: 4px;
             font-size: 12px;
+        }
+        
+        .storage-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .storage-fill {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s;
+        }
+        
+        .popup-content {
+            max-width: 280px;
+            font-size: 13px;
+        }
+        
+        .popup-header {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #2c5530;
+        }
+        
+        .popup-row {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .popup-label {
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .popup-value {
+            color: #333;
+        }
+        
+        .popup-notes {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-style: italic;
+        }
+        
+        .popup-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+        }
+        
+        .popup-actions button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .records-list {
+            margin-top: 15px;
             max-height: 200px;
             overflow-y: auto;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-        
-        th, td {
-            padding: 4px;
             border: 1px solid #ddd;
-            text-align: left;
+            border-radius: 4px;
+            padding: 10px;
         }
         
-        th {
-            background: #e9ecef;
-            font-weight: bold;
+        .record-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
         }
+        
+        .record-item:hover {
+            background: #e9ecef;
+        }
+        
+        .record-crop {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .record-date {
+            color: #666;
+            font-size: 11px;
+        }
+        
+        /* 作物の状態による色分け */
+        .status-excellent { color: #28a745; }
+        .status-good { color: #17a2b8; }
+        .status-normal { color: #ffc107; }
+        .status-poor { color: #dc3545; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
-    <div class="panel">
-        <h3>🦆 DuckDB道路陥没記録</h3>
-        <button class="add" onclick="startAdding()">📍 記録追加</button>
-        <button class="export" onclick="exportGeoJSON()">📥 GeoJSON出力</button>
-        <button class="query" onclick="toggleQueryPanel()">🔍 SQL実行</button>
-        <button class="clear" onclick="clearAll()">🗑️ 全削除</button>
-        <div class="info">
-            <div>記録数: <span id="count">0</span></div>
-            <div>DB状態: <span id="dbStatus">初期化中...</span></div>
+    <div class="main-panel">
+        <h3>🌱 作物育成記録システム</h3>
+        
+        <div id="recordForm" style="display: none;">
+            <div class="form-group">
+                <label>作物名 *</label>
+                <select id="cropType">
+                    <option value="">選択してください</option>
+                    <option value="トマト">🍅 トマト</option>
+                    <option value="キュウリ">🥒 キュウリ</option>
+                    <option value="ナス">🍆 ナス</option>
+                    <option value="ピーマン">🫑 ピーマン</option>
+                    <option value="レタス">🥬 レタス</option>
+                    <option value="キャベツ">🥬 キャベツ</option>
+                    <option value="ダイコン">🥕 ダイコン</option>
+                    <option value="ニンジン">🥕 ニンジン</option>
+                    <option value="ジャガイモ">🥔 ジャガイモ</option>
+                    <option value="タマネギ">🧅 タマネギ</option>
+                    <option value="その他">🌿 その他</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="customCropGroup" style="display: none;">
+                <label>作物名（その他）</label>
+                <input type="text" id="customCrop" placeholder="作物名を入力">
+            </div>
+            
+            <div class="form-group">
+                <label>生育ステージ *</label>
+                <select id="growthStage">
+                    <option value="">選択してください</option>
+                    <option value="播種">🌰 播種</option>
+                    <option value="発芽">🌱 発芽</option>
+                    <option value="育苗">🌿 育苗</option>
+                    <option value="定植">🪴 定植</option>
+                    <option value="生長期">🌳 生長期</option>
+                    <option value="開花">🌸 開花</option>
+                    <option value="結実">🍎 結実</option>
+                    <option value="収穫">🌾 収穫</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>生育状況 *</label>
+                <select id="condition">
+                    <option value="">選択してください</option>
+                    <option value="優良">😊 優良</option>
+                    <option value="良好">🙂 良好</option>
+                    <option value="普通">😐 普通</option>
+                    <option value="不良">😟 不良</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>記録日</label>
+                <input type="date" id="recordDate" value="">
+            </div>
+            
+            <div class="form-group">
+                <label>メモ</label>
+                <textarea id="notes" placeholder="水やり、肥料、病害虫など..."></textarea>
+            </div>
+            
+            <button class="btn-primary" onclick="saveRecord()">💾 記録を保存</button>
+            <button class="btn-secondary" onclick="cancelRecord()">❌ キャンセル</button>
         </div>
+        
+        <div id="mainButtons">
+            <button class="btn-primary" onclick="startRecording()">📍 新規記録</button>
+            <button class="btn-info" onclick="exportData()">📥 データ出力</button>
+            <button class="btn-info" onclick="importData()">📤 データ読込</button>
+            <button class="btn-danger" onclick="clearAll()">🗑️ 全削除</button>
+        </div>
+        
+        <div class="storage-info">
+            <div>保存件数: <span id="recordCount">0</span>件</div>
+            <div>使用容量: <span id="storageUsed">0</span> KB / 5000 KB</div>
+            <div class="storage-bar">
+                <div class="storage-fill" id="storageFill"></div>
+            </div>
+        </div>
+        
+        <div class="records-list" id="recordsList">
+            <div style="text-align: center; color: #999;">記録がありません</div>
+        </div>
+        
         <div class="status" id="status"></div>
     </div>
     
-    <div class="query-panel" id="queryPanel">
-        <h3>SQL クエリ実行</h3>
-        <textarea id="sqlInput" placeholder="SELECT * FROM potholes ORDER BY timestamp DESC LIMIT 10">SELECT * FROM potholes ORDER BY timestamp DESC LIMIT 10</textarea>
-        <button onclick="executeQuery()">実行</button>
-        <button onclick="toggleQueryPanel()">閉じる</button>
-        <div class="query-result" id="queryResult"></div>
-    </div>
+    <input type="file" id="importFile" accept=".json" style="display: none;">
     
     <script>
-        let map, db, conn, adding = false;
+        let map, isRecording = false, pendingCoords = null;
+        const STORAGE_KEY = 'crop_records';
+        
+        // 初期化
+        function init() {
+            // 今日の日付をセット
+            document.getElementById('recordDate').value = new Date().toISOString().split('T')[0];
+            
+            // 作物タイプ変更時の処理
+            document.getElementById('cropType').addEventListener('change', (e) => {
+                const customGroup = document.getElementById('customCropGroup');
+                if (e.target.value === 'その他') {
+                    customGroup.style.display = 'block';
+                } else {
+                    customGroup.style.display = 'none';
+                    document.getElementById('customCrop').value = '';
+                }
+            });
+            
+            updateStorageInfo();
+            loadRecordsList();
+        }
+        
+        // LocalStorageからデータ読み込み
+        function loadRecords() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.error('データ読み込みエラー:', e);
+                return [];
+            }
+        }
+        
+        // LocalStorageにデータ保存
+        function saveRecords(records) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+                updateStorageInfo();
+                loadRecordsList();
+                return true;
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    showStatus('ストレージ容量が不足しています', 'error');
+                } else {
+                    showStatus('保存エラー: ' + e.message, 'error');
+                }
+                return false;
+            }
+        }
+        
+        // ストレージ情報更新
+        function updateStorageInfo() {
+            const records = loadRecords();
+            document.getElementById('recordCount').textContent = records.length;
+            
+            // 使用容量計算（概算）
+            const dataSize = new Blob([JSON.stringify(records)]).size / 1024;
+            document.getElementById('storageUsed').textContent = dataSize.toFixed(1);
+            
+            // プログレスバー更新
+            const percentage = Math.min((dataSize / 5000) * 100, 100);
+            document.getElementById('storageFill').style.width = percentage + '%';
+            
+            if (percentage > 80) {
+                document.getElementById('storageFill').style.background = '#dc3545';
+            } else if (percentage > 60) {
+                document.getElementById('storageFill').style.background = '#ffc107';
+            }
+        }
+        
+        // 記録リスト更新
+        function loadRecordsList() {
+            const records = loadRecords();
+            const listEl = document.getElementById('recordsList');
+            
+            if (records.length === 0) {
+                listEl.innerHTML = '<div style="text-align: center; color: #999;">記録がありません</div>';
+                return;
+            }
+            
+            // 日付順（新しい順）にソート
+            records.sort((a, b) => new Date(b.recordDate) - new Date(a.recordDate));
+            
+            listEl.innerHTML = records.slice(0, 10).map(record => `
+                <div class="record-item" onclick="focusRecord('${record.id}')">
+                    <div class="record-crop">${getCropEmoji(record.cropType)} ${record.cropType}</div>
+                    <div>${getStageEmoji(record.growthStage)} ${record.growthStage} - 
+                        <span class="status-${record.condition.toLowerCase()}">${record.condition}</span>
+                    </div>
+                    <div class="record-date">${new Date(record.recordDate).toLocaleDateString('ja-JP')}</div>
+                </div>
+            `).join('');
+            
+            if (records.length > 10) {
+                listEl.innerHTML += '<div style="text-align: center; color: #666; font-size: 11px; margin-top: 5px;">他 ' + (records.length - 10) + ' 件</div>';
+            }
+        }
+        
+        // 絵文字取得
+        function getCropEmoji(crop) {
+            const emojis = {
+                'トマト': '🍅',
+                'キュウリ': '🥒',
+                'ナス': '🍆',
+                'ピーマン': '🫑',
+                'レタス': '🥬',
+                'キャベツ': '🥬',
+                'ダイコン': '🥕',
+                'ニンジン': '🥕',
+                'ジャガイモ': '🥔',
+                'タマネギ': '🧅'
+            };
+            return emojis[crop] || '🌿';
+        }
+        
+        function getStageEmoji(stage) {
+            const emojis = {
+                '播種': '🌰',
+                '発芽': '🌱',
+                '育苗': '🌿',
+                '定植': '🪴',
+                '生長期': '🌳',
+                '開花': '🌸',
+                '結実': '🍎',
+                '収穫': '🌾'
+            };
+            return emojis[stage] || '🌱';
+        }
         
         // ステータス表示
         function showStatus(msg, type = 'success') {
@@ -150,229 +450,216 @@
             status.textContent = msg;
             status.className = `status ${type}`;
             status.style.display = 'block';
-            if (type !== 'loading') {
-                setTimeout(() => status.style.display = 'none', 3000);
-            }
+            setTimeout(() => status.style.display = 'none', 3000);
         }
         
-        // DuckDB初期化
-        async function initDuckDB() {
-            showStatus('DuckDBを初期化中...', 'loading');
-            
-            try {
-                // DuckDB WASMを初期化
-                const DUCKDB_CONFIG = {
-                    query: {
-                        castBigIntToDouble: true,
-                    },
-                    path: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/',
-                };
-                
-                const bundle = await duckdb.selectBundle(DUCKDB_CONFIG);
-                const worker = await duckdb.createWorker(bundle.mainWorker);
-                const logger = new duckdb.ConsoleLogger();
-                db = new duckdb.AsyncDuckDB(logger, worker);
-                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-                
-                // 永続化のためIndexedDBを使用
-                await db.open({
-                    path: ':memory:',
-                    query: {
-                        castBigIntToDouble: true,
-                    }
-                });
-                
-                conn = await db.connect();
-                
-                // テーブル作成
-                await conn.query(`
-                    CREATE TABLE IF NOT EXISTS potholes (
-                        id VARCHAR PRIMARY KEY,
-                        lon DOUBLE NOT NULL,
-                        lat DOUBLE NOT NULL,
-                        description VARCHAR,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                `);
-                
-                // Spatial拡張を試みる（利用可能な場合）
-                try {
-                    await conn.query(`INSTALL spatial; LOAD spatial;`);
-                    console.log('Spatial拡張をロードしました');
-                } catch (e) {
-                    console.log('Spatial拡張は利用できません');
-                }
-                
-                document.getElementById('dbStatus').textContent = '接続済み';
-                showStatus('DuckDBの初期化完了', 'success');
-                
-                // データ読み込み
-                await loadData();
-                
-            } catch (error) {
-                console.error('DuckDB初期化エラー:', error);
-                document.getElementById('dbStatus').textContent = 'エラー';
-                showStatus('DuckDB初期化失敗', 'error');
-            }
-        }
-        
-        // データ読み込み
-        async function loadData() {
-            try {
-                const result = await conn.query(`
-                    SELECT id, lon, lat, description, timestamp 
-                    FROM potholes 
-                    ORDER BY timestamp DESC
-                `);
-                
-                const rows = result.toArray();
-                const features = rows.map(row => ({
-                    type: 'Feature',
-                    id: row.id,
-                    geometry: {
-                        type: 'Point',
-                        coordinates: [row.lon, row.lat]
-                    },
-                    properties: {
-                        id: row.id,
-                        description: row.description,
-                        timestamp: row.timestamp
-                    }
-                }));
-                
-                map.getSource('potholes').setData({
-                    type: 'FeatureCollection',
-                    features: features
-                });
-                
-                document.getElementById('count').textContent = features.length;
-                
-            } catch (error) {
-                console.error('データ読み込みエラー:', error);
-            }
-        }
-        
-        // 記録追加
-        function startAdding() {
-            adding = true;
+        // 記録開始
+        function startRecording() {
+            isRecording = true;
             map.getCanvas().style.cursor = 'crosshair';
-            showStatus('地図をクリックして位置を選択', 'loading');
+            document.getElementById('recordForm').style.display = 'block';
+            document.getElementById('mainButtons').style.display = 'none';
+            showStatus('地図上をクリックして場所を選択してください', 'success');
         }
         
-        // 全削除
-        async function clearAll() {
-            if (!confirm('全てのデータを削除しますか？')) return;
+        // 記録キャンセル
+        function cancelRecord() {
+            isRecording = false;
+            pendingCoords = null;
+            map.getCanvas().style.cursor = '';
+            document.getElementById('recordForm').style.display = 'none';
+            document.getElementById('mainButtons').style.display = 'block';
             
-            try {
-                await conn.query('DELETE FROM potholes');
-                await loadData();
-                showStatus('全データを削除しました', 'success');
-            } catch (error) {
-                showStatus('削除エラー', 'error');
+            // フォームリセット
+            document.getElementById('cropType').value = '';
+            document.getElementById('customCrop').value = '';
+            document.getElementById('growthStage').value = '';
+            document.getElementById('condition').value = '';
+            document.getElementById('notes').value = '';
+            document.getElementById('recordDate').value = new Date().toISOString().split('T')[0];
+        }
+        
+        // 記録保存
+        function saveRecord() {
+            if (!pendingCoords) {
+                showStatus('地図上で場所を選択してください', 'error');
+                return;
+            }
+            
+            const cropType = document.getElementById('cropType').value;
+            const customCrop = document.getElementById('customCrop').value;
+            const growthStage = document.getElementById('growthStage').value;
+            const condition = document.getElementById('condition').value;
+            
+            // バリデーション
+            if (!cropType) {
+                showStatus('作物名を選択してください', 'error');
+                return;
+            }
+            
+            if (cropType === 'その他' && !customCrop) {
+                showStatus('作物名を入力してください', 'error');
+                return;
+            }
+            
+            if (!growthStage || !condition) {
+                showStatus('必須項目を入力してください', 'error');
+                return;
+            }
+            
+            const record = {
+                id: Date.now().toString(),
+                coordinates: pendingCoords,
+                cropType: cropType === 'その他' ? customCrop : cropType,
+                growthStage: growthStage,
+                condition: condition,
+                recordDate: document.getElementById('recordDate').value,
+                notes: document.getElementById('notes').value,
+                createdAt: new Date().toISOString()
+            };
+            
+            const records = loadRecords();
+            records.push(record);
+            
+            if (saveRecords(records)) {
+                showStatus('記録を保存しました', 'success');
+                updateMap();
+                cancelRecord();
             }
         }
         
-        // 個別削除
-        window.removePothole = async (id) => {
-            try {
-                await conn.query('DELETE FROM potholes WHERE id = ?', [id]);
-                await loadData();
-                showStatus('削除しました', 'success');
-            } catch (error) {
-                showStatus('削除エラー', 'error');
+        // 地図更新
+        function updateMap() {
+            const records = loadRecords();
+            const features = records.map(record => ({
+                type: 'Feature',
+                id: record.id,
+                geometry: {
+                    type: 'Point',
+                    coordinates: record.coordinates
+                },
+                properties: record
+            }));
+            
+            map.getSource('crops').setData({
+                type: 'FeatureCollection',
+                features: features
+            });
+        }
+        
+        // 特定の記録にフォーカス
+        window.focusRecord = function(id) {
+            const records = loadRecords();
+            const record = records.find(r => r.id === id);
+            if (record) {
+                map.flyTo({
+                    center: record.coordinates,
+                    zoom: 15
+                });
+                
+                // ポップアップ表示
+                showRecordPopup(record);
             }
         };
         
-        // GeoJSONエクスポート
-        async function exportGeoJSON() {
-            try {
-                const result = await conn.query(`
-                    SELECT id, lon, lat, description, timestamp 
-                    FROM potholes 
-                    ORDER BY timestamp DESC
-                `);
-                
-                const rows = result.toArray();
-                const geojson = {
-                    type: 'FeatureCollection',
-                    features: rows.map(row => ({
-                        type: 'Feature',
-                        id: row.id,
-                        geometry: {
-                            type: 'Point',
-                            coordinates: [row.lon, row.lat]
-                        },
-                        properties: {
-                            id: row.id,
-                            description: row.description,
-                            timestamp: row.timestamp
-                        }
-                    }))
-                };
-                
-                const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `potholes_${new Date().toISOString().split('T')[0]}.geojson`;
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                showStatus('GeoJSONをエクスポートしました', 'success');
-            } catch (error) {
-                showStatus('エクスポートエラー', 'error');
-            }
-        }
-        
-        // SQLクエリパネル切り替え
-        function toggleQueryPanel() {
-            const panel = document.getElementById('queryPanel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
-        
-        // SQLクエリ実行
-        async function executeQuery() {
-            const sql = document.getElementById('sqlInput').value;
-            const resultDiv = document.getElementById('queryResult');
+        // 記録のポップアップ表示
+        function showRecordPopup(record) {
+            const conditionClass = `status-${record.condition.toLowerCase()}`;
+            const html = `
+                <div class="popup-content">
+                    <div class="popup-header">${getCropEmoji(record.cropType)} ${record.cropType}</div>
+                    <div class="popup-row">
+                        <span class="popup-label">生育ステージ:</span>
+                        <span class="popup-value">${getStageEmoji(record.growthStage)} ${record.growthStage}</span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-label">状態:</span>
+                        <span class="popup-value ${conditionClass}">${record.condition}</span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-label">記録日:</span>
+                        <span class="popup-value">${new Date(record.recordDate).toLocaleDateString('ja-JP')}</span>
+                    </div>
+                    ${record.notes ? `<div class="popup-notes">${record.notes}</div>` : ''}
+                    <div class="popup-actions">
+                        <button onclick="deleteRecord('${record.id}')">削除</button>
+                    </div>
+                </div>
+            `;
             
-            try {
-                const result = await conn.query(sql);
-                const rows = result.toArray();
-                
-                if (rows.length === 0) {
-                    resultDiv.innerHTML = '<p>結果なし</p>';
-                    return;
-                }
-                
-                // テーブル作成
-                let html = '<table><thead><tr>';
-                const columns = Object.keys(rows[0]);
-                columns.forEach(col => html += `<th>${col}</th>`);
-                html += '</tr></thead><tbody>';
-                
-                rows.forEach(row => {
-                    html += '<tr>';
-                    columns.forEach(col => {
-                        let value = row[col];
-                        if (value instanceof Date) {
-                            value = value.toLocaleString('ja-JP');
-                        }
-                        html += `<td>${value ?? ''}</td>`;
-                    });
-                    html += '</tr>';
-                });
-                
-                html += '</tbody></table>';
-                resultDiv.innerHTML = html;
-                
-                // SELECT以外のクエリの場合はデータを再読み込み
-                if (!sql.trim().toUpperCase().startsWith('SELECT')) {
-                    await loadData();
-                }
-                
-            } catch (error) {
-                resultDiv.innerHTML = `<p style="color: red;">エラー: ${error.message}</p>`;
+            new maplibregl.Popup()
+                .setLngLat(record.coordinates)
+                .setHTML(html)
+                .addTo(map);
+        }
+        
+        // 記録削除
+        window.deleteRecord = function(id) {
+            if (!confirm('この記録を削除しますか？')) return;
+            
+            const records = loadRecords();
+            const filtered = records.filter(r => r.id !== id);
+            
+            if (saveRecords(filtered)) {
+                showStatus('記録を削除しました', 'success');
+                updateMap();
             }
+        };
+        
+        // データエクスポート
+        function exportData() {
+            const records = loadRecords();
+            const dataStr = JSON.stringify(records, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `crop_records_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus('データをエクスポートしました', 'success');
+        }
+        
+        // データインポート
+        function importData() {
+            document.getElementById('importFile').click();
+        }
+        
+        document.getElementById('importFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (Array.isArray(imported)) {
+                        if (confirm(`${imported.length}件のデータをインポートしますか？\n既存のデータは上書きされます。`)) {
+                            if (saveRecords(imported)) {
+                                showStatus('データをインポートしました', 'success');
+                                updateMap();
+                            }
+                        }
+                    } else {
+                        showStatus('無効なデータ形式です', 'error');
+                    }
+                } catch (error) {
+                    showStatus('ファイルの読み込みに失敗しました', 'error');
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        });
+        
+        // 全削除
+        function clearAll() {
+            if (!confirm('すべての記録を削除しますか？\nこの操作は取り消せません。')) return;
+            
+            localStorage.removeItem(STORAGE_KEY);
+            updateStorageInfo();
+            loadRecordsList();
+            updateMap();
+            showStatus('すべての記録を削除しました', 'success');
         }
         
         // 地図初期化
@@ -389,75 +676,66 @@
             trackUserLocation: true
         }));
         
-        map.on('load', async () => {
+        map.on('load', () => {
             // データソース追加
-            map.addSource('potholes', {
+            map.addSource('crops', {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] }
             });
             
-            // レイヤー追加
+            // レイヤー追加（状態によって色分け）
             map.addLayer({
-                id: 'potholes',
+                id: 'crops',
                 type: 'circle',
-                source: 'potholes',
+                source: 'crops',
                 paint: {
-                    'circle-radius': 8,
-                    'circle-color': '#ff0000',
-                    'circle-stroke-color': '#fff',
+                    'circle-radius': 10,
+                    'circle-color': [
+                        'match',
+                        ['get', 'condition'],
+                        '優良', '#28a745',
+                        '良好', '#17a2b8',
+                        '普通', '#ffc107',
+                        '不良', '#dc3545',
+                        '#999999'
+                    ],
+                    'circle-stroke-color': '#ffffff',
                     'circle-stroke-width': 2
                 }
             });
             
-            // DuckDB初期化
-            await initDuckDB();
+            // 初期化
+            init();
+            updateMap();
         });
         
-        // クリックで追加
-        map.on('click', async (e) => {
-            if (!adding) return;
-            adding = false;
+        // 地図クリック
+        map.on('click', (e) => {
+            if (!isRecording) return;
+            
+            pendingCoords = [e.lngLat.lng, e.lngLat.lat];
             map.getCanvas().style.cursor = '';
-            document.getElementById('status').style.display = 'none';
+            showStatus('場所を選択しました。記録内容を入力してください', 'success');
             
-            const desc = prompt('説明（任意）:') || '';
-            const id = Date.now().toString();
-            
-            try {
-                await conn.query(
-                    'INSERT INTO potholes (id, lon, lat, description) VALUES (?, ?, ?, ?)',
-                    [id, e.lngLat.lng, e.lngLat.lat, desc]
-                );
-                await loadData();
-                showStatus('記録を追加しました', 'success');
-            } catch (error) {
-                showStatus('追加エラー', 'error');
-            }
-        });
-        
-        // ポイントクリックでポップアップ
-        map.on('click', 'potholes', (e) => {
-            const p = e.features[0].properties;
-            const timestamp = new Date(p.timestamp).toLocaleString('ja-JP');
-            
-            new maplibregl.Popup()
-                .setLngLat(e.features[0].geometry.coordinates)
-                .setHTML(`
-                    <div class="popup">
-                        <strong>記録日時:</strong> ${timestamp}<br>
-                        <strong>説明:</strong> ${p.description || 'なし'}<br>
-                        <button onclick="removePothole('${p.id}')">削除</button>
-                    </div>
-                `)
+            // 仮マーカー表示
+            new maplibregl.Marker({ color: '#28a745' })
+                .setLngLat(pendingCoords)
                 .addTo(map);
         });
         
-        // カーソル変更
-        map.on('mouseenter', 'potholes', () => {
-            map.getCanvas().style.cursor = 'pointer';
+        // ポイントクリック
+        map.on('click', 'crops', (e) => {
+            e.preventDefault();
+            const record = e.features[0].properties;
+            showRecordPopup(record);
         });
-        map.on('mouseleave', 'potholes', () => {
-            map.getCanvas().style.cursor = '';
+        
+        // カーソル変更
+        map.on('mouseenter', 'crops', () => {
+            if (!isRecording) map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'crops', () => {
+            if (!isRecording) map.getCanvas().style.cursor = '';
         });
     </script>
 </body>

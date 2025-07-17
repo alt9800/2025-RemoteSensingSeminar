@@ -122,10 +122,10 @@
     
     <div class="panel">
         <h3>🦆 DuckDB道路陥没記録</h3>
-        <button class="add" onclick="startAdding()">📍 記録追加</button>
-        <button class="export" onclick="exportGeoJSON()">📥 GeoJSON出力</button>
-        <button class="query" onclick="toggleQueryPanel()">🔍 SQL実行</button>
-        <button class="clear" onclick="clearAll()">🗑️ 全削除</button>
+        <button class="add" onclick="startAdding()" id="addBtn">📍 記録追加</button>
+        <button class="export" onclick="exportGeoJSON()" id="exportBtn">📥 GeoJSON出力</button>
+        <button class="query" onclick="toggleQueryPanel()" id="queryBtn">🔍 SQL実行</button>
+        <button class="clear" onclick="clearAll()" id="clearBtn">🗑️ 全削除</button>
         <div class="info">
             <div>記録数: <span id="count">0</span></div>
             <div>DB状態: <span id="dbStatus">初期化中...</span></div>
@@ -144,6 +144,14 @@
     <script>
         let map, db, conn, adding = false;
         
+        // ボタンの有効/無効を制御
+        function setButtonsEnabled(enabled) {
+            document.getElementById('addBtn').disabled = !enabled;
+            document.getElementById('exportBtn').disabled = !enabled;
+            document.getElementById('queryBtn').disabled = !enabled;
+            document.getElementById('clearBtn').disabled = !enabled;
+        }
+        
         // ステータス表示
         function showStatus(msg, type = 'success') {
             const status = document.getElementById('status');
@@ -158,6 +166,7 @@
         // DuckDB初期化
         async function initDuckDB() {
             showStatus('DuckDBを初期化中...', 'loading');
+            setButtonsEnabled(false);
             
             try {
                 // DuckDB WASMを初期化
@@ -174,14 +183,7 @@
                 db = new duckdb.AsyncDuckDB(logger, worker);
                 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
                 
-                // 永続化のためIndexedDBを使用
-                await db.open({
-                    path: ':memory:',
-                    query: {
-                        castBigIntToDouble: true,
-                    }
-                });
-                
+                // メモリ内データベースとして開く
                 conn = await db.connect();
                 
                 // テーブル作成
@@ -191,20 +193,13 @@
                         lon DOUBLE NOT NULL,
                         lat DOUBLE NOT NULL,
                         description VARCHAR,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        timestamp TIMESTAMP NOT NULL
                     )
                 `);
                 
-                // Spatial拡張を試みる（利用可能な場合）
-                try {
-                    await conn.query(`INSTALL spatial; LOAD spatial;`);
-                    console.log('Spatial拡張をロードしました');
-                } catch (e) {
-                    console.log('Spatial拡張は利用できません');
-                }
-                
                 document.getElementById('dbStatus').textContent = '接続済み';
                 showStatus('DuckDBの初期化完了', 'success');
+                setButtonsEnabled(true);
                 
                 // データ読み込み
                 await loadData();
@@ -212,7 +207,7 @@
             } catch (error) {
                 console.error('DuckDB初期化エラー:', error);
                 document.getElementById('dbStatus').textContent = 'エラー';
-                showStatus('DuckDB初期化失敗', 'error');
+                showStatus('DuckDB初期化失敗: ' + error.message, 'error');
             }
         }
         
@@ -236,7 +231,7 @@
                     properties: {
                         id: row.id,
                         description: row.description,
-                        timestamp: row.timestamp
+                        timestamp: row.timestamp.toISOString()
                     }
                 }));
                 
@@ -268,18 +263,19 @@
                 await loadData();
                 showStatus('全データを削除しました', 'success');
             } catch (error) {
-                showStatus('削除エラー', 'error');
+                showStatus('削除エラー: ' + error.message, 'error');
             }
         }
         
         // 個別削除
         window.removePothole = async (id) => {
             try {
-                await conn.query('DELETE FROM potholes WHERE id = ?', [id]);
+                // パラメータ化クエリの代わりに、適切にエスケープ
+                await conn.query(`DELETE FROM potholes WHERE id = '${id}'`);
                 await loadData();
                 showStatus('削除しました', 'success');
             } catch (error) {
-                showStatus('削除エラー', 'error');
+                showStatus('削除エラー: ' + error.message, 'error');
             }
         };
         
@@ -305,7 +301,7 @@
                         properties: {
                             id: row.id,
                             description: row.description,
-                            timestamp: row.timestamp
+                            timestamp: row.timestamp.toISOString()
                         }
                     }))
                 };
@@ -320,7 +316,7 @@
                 
                 showStatus('GeoJSONをエクスポートしました', 'success');
             } catch (error) {
-                showStatus('エクスポートエラー', 'error');
+                showStatus('エクスポートエラー: ' + error.message, 'error');
             }
         }
         
@@ -415,28 +411,32 @@
         
         // クリックで追加
         map.on('click', async (e) => {
-            if (!adding) return;
+            if (!adding || !conn) return;
             adding = false;
             map.getCanvas().style.cursor = '';
             document.getElementById('status').style.display = 'none';
             
             const desc = prompt('説明（任意）:') || '';
             const id = Date.now().toString();
+            const timestamp = new Date().toISOString();
             
             try {
-                await conn.query(
-                    'INSERT INTO potholes (id, lon, lat, description) VALUES (?, ?, ?, ?)',
-                    [id, e.lngLat.lng, e.lngLat.lat, desc]
-                );
+                // シンプルなINSERT文を使用
+                await conn.query(`
+                    INSERT INTO potholes (id, lon, lat, description, timestamp) 
+                    VALUES ('${id}', ${e.lngLat.lng}, ${e.lngLat.lat}, '${desc.replace(/'/g, "''")}', '${timestamp}')
+                `);
                 await loadData();
                 showStatus('記録を追加しました', 'success');
             } catch (error) {
-                showStatus('追加エラー', 'error');
+                console.error('追加エラー:', error);
+                showStatus('追加エラー: ' + error.message, 'error');
             }
         });
         
         // ポイントクリックでポップアップ
         map.on('click', 'potholes', (e) => {
+            e.stopPropagation(); // 地図クリックイベントの伝播を防ぐ
             const p = e.features[0].properties;
             const timestamp = new Date(p.timestamp).toLocaleString('ja-JP');
             
