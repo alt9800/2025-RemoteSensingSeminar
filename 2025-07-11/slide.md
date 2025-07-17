@@ -222,18 +222,26 @@ Model-View-Controller
 
 ---
 
-IndexedDBについて
+[IndexedDBをつかう](./pseudo-DB/useIndexedDB/)
 
 
 ---
 
-DuckDBについて
+[ローカルストレージを使う](./pseudo-DB/useLocalStorage/)
 
 
 ---
 
-ローカルストレージ
+[DuckDBを使う](./pseudo-DB/useDuckDB/)
 
+
+---
+
+
+[Node.jsを使ってファイル書き込みをするパターン](./pseudo-DB/useNodejs/)
+
+
+---
 
 (クッキーやセッションストレージについて)
 
