@@ -1,58 +1,27 @@
-## Dockerで動かしたい場合
+## npmで実行環境をインストールする
 
-Dockerのクライアントを導入する
+どこがサーバーで、どこがフロントエンドか気をつけながら設定しましょう。
 
-https://www.docker.com/get-started/
+事前準備
+```sh
+# 依存関係のインストール
+npm install
+(cp .env.example .env)
 
-Docker hubへのログインは必須ではないほか、Docker Desktop以外のクライアントでもよい。
-Limaがお勧めです。PodmanやOrbstack、AppleのDevContainerなどもあります。
-Amazonの Finch なども。
-
-(WSL Ubuntuなどで動かすのであればこれでコマンドラインから導入してもOK!)
-```
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-```
-
-
-## ディレクトリ構造
-
+# データベースの初期化
+node scripts/init-db.js
 
 ```
-field-survey-app/
-├── docker-compose.yml
-├── Dockerfile
-├── init.sql
-├── package.json
-├── .env                    # .env.exampleからコピー
-├── .env.example
-├── src/
-│   ├── server.js           # メインサーバーファイル
-│   ├── config/
-│   │   └── db.js          # データベース接続設定
-│   ├── middleware/
-│   │   └── auth.js        # JWT認証ミドルウェア
-│   └── routes/
-│       ├── auth.js        # 認証関連API (/api/auth/*)
-│       ├── posts.js       # 投稿関連API (/api/posts/*)
-│       └── users.js       # ユーザー関連API (/api/users/*)
-├── public/                 # 静的ファイル（フロントエンド）
-│   ├── index.html         # メインページ（地図表示）
-│   ├── css/
-│   │   └── style.css      # 共通スタイル
-│   ├── js/
-│   │   ├── map.js         # 地図機能（MapLibre GL JS）
-│   │   ├── auth.js        # 認証関連のJS（ログイン・ログアウト処理）
-│   │   └── common.js      # 共通機能（ヘッダー制御など）
-│   ├── signup/
-│   │   └── index.html     # サインアップページ
-│   ├── login/
-│   │   └── index.html     # ログインページ
-│   └── mypage/
-│       └── index.html     # マイページ（自分の投稿一覧）
-└── uploads/               # アップロードされた画像の保存先
-    └── .gitkeep
+
+実行
+```sh
+npm run dev
+# 本番環境では以下のコマンドを使う様にする
+npm start
 ```
+
+
+---
 
 APIエンドポイント
 
@@ -109,32 +78,27 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 ---
 
-
-こんな感じでも動く
+npm版(ベアメタル)ディレクトリ構成
 
 ```sh
 project/
-├── server.js              # Expressサーバー
 ├── package.json
-├── public/               # 静的ファイル
-│   ├── index.html       # メインページ（地図表示）
-│   ├── signup/
-│   │   └── index.html   # サインアップページ
-│   ├── login/
-│   │   └── index.html   # ログインページ
-│   ├── mypage/
-│   │   └── index.html   # マイページ
-│   ├── css/
-│   │   └── style.css    # 共通スタイル
-│   └── js/
-│       ├── map.js       # 地図機能
-│       ├── auth.js      # 認証関連
-│       └── common.js    # 共通機能
-├── uploads/             # アップロード画像保存先
-├── db/
-│   └── database.db      # SQLiteデータベース
-└── routes/              # APIルート
-    ├── auth.js          # 認証API
-    ├── posts.js         # 投稿API
-    └── users.js         # ユーザーAPI
+├── .env                    # 環境変数（.env.exampleからコピー）
+├── .env.example
+├── scripts/
+│   └── init-db.js         # データベース初期化スクリプト
+├── src/
+│   ├── server.js          # メインサーバーファイル
+│   ├── config/
+│   │   └── db.js          # SQLite接続設定
+│   ├── middleware/
+│   │   └── auth.js        # JWT認証ミドルウェア
+│   └── routes/
+│       ├── auth.js        # 認証関連API
+│       ├── posts.js       # 投稿関連API
+│       └── users.js       # ユーザー関連API
+├── public/                # 静的ファイル（フロントエンド）
+├── uploads/               # アップロードされた画像
+└── db/
+    └── database.db        # SQLiteデータベースファイル
 ```

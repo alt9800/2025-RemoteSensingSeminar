@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MapLibre GL JS ポイント管理システム</title>
+    <script src='https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css' rel='stylesheet' />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+        
+        .sidebar {
+            width: 400px;
+            background: #f5f5f5;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button.delete {
+            background: #f44336;
+        }
+        
+        button.delete:hover {
+            background: #da190b;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        tr:hover {
+            background: #f0f0f0;
+        }
+        
+        .info {
+            background: #e3f2fd;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .popup-content {
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="sidebar">
+            <h2>ポイント管理</h2>
+            
+            <div class="info">
+                地図をクリックして点を追加できます
+            </div>
+            
+            <div class="controls">
+                <button onclick="exportCSV()">CSVエクスポート</button>
+                <button onclick="exportJSON()">JSONエクスポート</button>
+                <button onclick="exportGeoJSON()">GeoJSONエクスポート</button>
+                <button onclick="clearAll()" class="delete">すべてクリア</button>
+            </div>
+            
+            <h3>登録されたポイント</h3>
+            <table id="pointsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>緯度</th>
+                        <th>経度</th>
+                        <th>名前</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 地図の初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://demotiles.maplibre.org/style.json',
+            center: [139.7670, 35.6812], // 東京
+            zoom: 10
+        });
+
+        // ポイントデータを格納する配列
+        let points = [];
+        let nextId = 1;
+
+        // 地図の読み込み完了後の処理
+        map.on('load', () => {
+            // ポイント用のソースを追加
+            map.addSource('points', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: []
+                }
+            });
+
+            // ポイントのレイヤーを追加
+            map.addLayer({
+                id: 'points-layer',
+                type: 'circle',
+                source: 'points',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#4CAF50',
+                    'circle-stroke-color': '#fff',
+                    'circle-stroke-width': 2
+                }
+            });
+
+            // 地図クリックイベント
+            map.on('click', (e) => {
+                const name = prompt('ポイント名を入力してください:');
+                if (name !== null) {
+                    addPoint(e.lngLat.lng, e.lngLat.lat, name || '未設定');
+                }
+            });
+
+            // ポイントホバー時のカーソル変更
+            map.on('mouseenter', 'points-layer', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', 'points-layer', () => {
+                map.getCanvas().style.cursor = '';
+            });
+
+            // ポイントクリック時のポップアップ表示
+            map.on('click', 'points-layer', (e) => {
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const properties = e.features[0].properties;
+
+                new maplibregl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(`
+                        <div class="popup-content">
+                            <strong>${properties.name}</strong><br>
+                            ID: ${properties.id}<br>
+                            緯度: ${properties.lat}<br>
+                            経度: ${properties.lng}
+                        </div>
+                    `)
+                    .addTo(map);
+
+                e.stopPropagation();
+            });
+        });
+
+        // ポイントを追加
+        function addPoint(lng, lat, name) {
+            const point = {
+                id: nextId++,
+                lng: lng.toFixed(6),
+                lat: lat.toFixed(6),
+                name: name
+            };
+
+            points.push(point);
+            updateMap();
+            updateTable();
+        }
+
+        // 地図を更新
+        function updateMap() {
+            const geojson = {
+                type: 'FeatureCollection',
+                features: points.map(p => ({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [parseFloat(p.lng), parseFloat(p.lat)]
+                    },
+                    properties: {
+                        id: p.id,
+                        name: p.name,
+                        lng: p.lng,
+                        lat: p.lat
+                    }
+                }))
+            };
+
+            map.getSource('points').setData(geojson);
+        }
+
+        // テーブルを更新
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            points.forEach(point => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${point.id}</td>
+                    <td>${point.lat}</td>
+                    <td>${point.lng}</td>
+                    <td>${point.name}</td>
+                    <td>
+                        <button onclick="deletePoint(${point.id})" class="delete">削除</button>
+                    </td>
+                `;
+            });
+        }
+
+        // ポイントを削除
+        function deletePoint(id) {
+            points = points.filter(p => p.id !== id);
+            updateMap();
+            updateTable();
+        }
+
+        // すべてクリア
+        function clearAll() {
+            if (confirm('すべてのポイントを削除しますか？')) {
+                points = [];
+                nextId = 1;
+                updateMap();
+                updateTable();
+            }
+        }
+
+        // CSV形式でエクスポート
+        function exportCSV() {
+            if (points.length === 0) {
+                alert('エクスポートするポイントがありません');
+                return;
+            }
+
+            const headers = ['ID', '緯度', '経度', '名前'];
+            const csvContent = [
+                headers.join(','),
+                ...points.map(p => `${p.id},${p.lat},${p.lng},"${p.name}"`)
+            ].join('\n');
+
+            downloadFile(csvContent, 'points.csv', 'text/csv;charset=utf-8;');
+        }
+
+        // JSON形式でエクスポート
+        function exportJSON() {
+            if (points.length === 0) {
+                alert('エクスポートするポイントがありません');
+                return;
+            }
+
+            const jsonContent = JSON.stringify(points, null, 2);
+            downloadFile(jsonContent, 'points.json', 'application/json');
+        }
+
+        // GeoJSON形式でエクスポート
+        function exportGeoJSON() {
+            if (points.length === 0) {
+                alert('エクスポートするポイントがありません');
+                return;
+            }
+
+            const geojson = {
+                type: 'FeatureCollection',
+                features: points.map(p => ({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [parseFloat(p.lng), parseFloat(p.lat)]
+                    },
+                    properties: {
+                        id: p.id,
+                        name: p.name
+                    }
+                }))
+            };
+
+            const geojsonContent = JSON.stringify(geojson, null, 2);
+            downloadFile(geojsonContent, 'points.geojson', 'application/geo+json');
+        }
+
+        // ファイルダウンロード処理
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

@@ -107,6 +107,12 @@ Node.jsが動く環境設定 / MapLibreの読み込み方
 
 ---
 
+ハンズオンのページを開きながら受講すると便利かも
+
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-07-11/
+
+---
+
 > 動的なWebアプリケーションとは？
 ### DBに保存された値によってフロントに表示される値が変わるサイト
 
@@ -118,13 +124,82 @@ https://project-4415519406887009516.web.app
 
 ---
 
-# 第六回までで完成する予定のアプリ
+# 第六回までで完成する予定のアプリの外観
 
 ---
 
+![alt text](assets/image2.png)
 
+
+---
+
+![alt text](assets/image1.png)
+
+
+---
+
+![alt text](assets/image3.png)
+
+![alt text](assets/image6.png)
+
+---
+
+![alt text](assets/image4.png)
+
+![alt text](assets/image5.png)
+
+
+ログの例1
+
+```
+Server is running on port 3000
+Environment: development
+Public directory: /Users/alex/Downloads/express/public
+Connected to SQLite database
+2025-07-17T20:52:07.950Z - GET /
+2025-07-17T20:52:08.060Z - GET /
+2025-07-17T20:52:08.163Z - GET /css/style.css
+2025-07-17T20:52:08.179Z - GET /js/common.js
+2025-07-17T20:52:08.179Z - GET /js/auth.js
+2025-07-17T20:52:08.180Z - GET /js/map.js
+2025-07-17T20:52:08.876Z - GET /apple-touch-icon-precomposed.png
+404 Not Found: /apple-touch-icon-precomposed.png
+2025-07-17T20:52:09.091Z - GET /favicon.ico
+404 Not Found: /favicon.ico
+2025-07-17T20:52:09.301Z - GET /apple-touch-icon.png
+404 Not Found: /apple-touch-icon.png
+```
+
+---
+ログの例2
+```
+2025-07-17T20:55:51.386Z - GET /js/map.js
+2025-07-17T20:55:51.825Z - GET /api/posts
+2025-07-17T20:56:33.959Z - POST /api/posts
+2025-07-17T20:56:35.341Z - GET /api/posts
+2025-07-17T20:56:35.347Z - GET /uploads/1752785793975-15964498.png
+2025-07-17T20:57:05.856Z - GET /
+2025-07-17T20:57:05.898Z - GET /css/style.css
+2025-07-17T20:57:05.900Z - GET /js/common.js
+2025-07-17T20:57:05.900Z - GET /js/auth.js
+2025-07-17T20:57:05.901Z - GET /js/map.js
+2025-07-17T20:57:06.306Z - GET /api/posts
+2025-07-17T20:57:06.314Z - GET /uploads/1752785793975-15964498.png
+2025-07-17T20:57:07.077Z - GET /signup/
+2025-07-17T20:57:07.083Z - GET /js/auth.js
+2025-07-17T20:57:07.084Z - GET /css/style.css
+2025-07-17T20:57:07.084Z - GET /js/common.js
+```
+---
+
+
+## Q.
 Dockerを使うと何が嬉しいか？
 
+## A.
+OSやディストリの様な環境ごとの差分を吸収し、どのチームメンバーのデバイスでもレシピ(Dockerfile)に基づいて同じ実行環境を用意することができます。
+
+詳しくは第五回や第六回にて触れます。今回はサンプルアプリの実行環境として利用しているんだな、くらいで見てもらえれば十分です。
 
 
 ---
@@ -168,6 +243,9 @@ CLIによるコマンドをバックグラウンドで独立して動かすこ�
 
 
 これらの機能をやさしく扱えるようにするための仕組みがWebフレームワークには揃っています。
+初めてのバックエンド開発で、上記の機能が必要になったら、フレームワークを使うと便利であることが多いです。
+もちろん、フレームワークより小さいライブラリを使ってフルスクラッチしるのも手です。
+(繰り返し処理が少ない場合、MVCにおいてはコントローラ部分が冗長で、性能を活かせなかったりします...)
 
 ---
 
@@ -209,6 +287,7 @@ C# のASP / JavaのSpring / Ruby on Rails / PHPのLaravel などもMVCのアー�
 ## 他のアーキテクチャ構造
 
 オニオンアーキテクチャ / マイクロサービス など
+
 
 
 ---
@@ -384,7 +463,7 @@ DOM側
 </body>
 </html>
 ```
-次ページにScript
+次ページにScriptを記載しています。
 
 ---
 ```javascript
@@ -543,6 +622,35 @@ https://opendata.fude.maff.go.jp/筆ポリゴンの利用規約.pdf
 
 ---
 
+## 逆に、データのエクスポートをしたい場合のサンプル
+
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-07-11/csv-n-json-export
+
+
+具体的な説明は以下の項目に
+https://alt9800.github.io/2025-RemoteSensingSeminar/handson/2025-07-11/
+
+ソース
+https://github.com/alt9800/2025-RemoteSensingSeminar/tree/main/2025-07-11/handson/csv-n-json-export
+
+---
+
+## Q. ブラウザから(クライアントのみで)ファイルへの「書き込みはできないの？」
+
+## A. 基本的にできません。
+
+LocalStorageやIndexedDBの様に、クライアント側の不揮発性メモリ領域を用いてデータを保存することができる部分を用いて、適切なエクスポートを助ける戦略を取ると良いでしょう。
+
+```
+🙅ブラウザのセキュリティの都合上、HTTPを用いてできないこと🙅
+// - ローカルファイルへの直接書き込み
+// - 特定のファイルパスへの自動保存
+// - ファイルの上書き保存
+```
+これらが可能だと攻撃者はユーザのローカルにあるファイルをいじり放題になってしまいます。
+
+---
+
 ## 便利なツール類
 
 ---
@@ -563,7 +671,7 @@ https://kepler.gl
 deck.glとMapLibreGL JSのGIS・3Dライブラリに、Loaders.jsなどを組み合わせた可視化基盤です。
 
 
-Try : 試しに筆ポリゴンのデータを読み込ませてみましょう
+☝️ 試しに筆ポリゴンのデータを読み込ませてみましょう
 
 
 ---
@@ -609,4 +717,28 @@ Mapbox社が提供しているWebアプリケーションで、
 
 ---
 
-トンネリングを用いてlocalhostの実行環境をインターネットに公開する。
+📝VSCodeのポートフォワードを用いてlocalhostの実行環境をインターネット経由でチームメンバーに公開することができます。
+
+
+https://code.visualstudio.com/updates/v1_82#_workbench
+
+
+---
+
+![alt text](assets/image7.png)
+
+![alt text](assets/image8.png)
+
+![alt text](assets/image9.png)
+
+
+---
+
+### 似た様なVSCodeの拡張機能
+
+### LiveShare 
+自身のVSCodeをインターネットに公開して、同時にファイルなどを編集する。
+(要Macrosoft or GitHubアカウント)
+
+### リモートトンネル 
+(sshなどを使って)自分のPC内のCLIやVSCodeにクラウド経由で外部から接続してもらう。

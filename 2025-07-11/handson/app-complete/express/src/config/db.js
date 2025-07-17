@@ -1,24 +1,64 @@
-const { Pool } = require('pg');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const fs = require('fs');
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'fieldsurvey',
-  user: process.env.DB_USER || 'fielduser',
-  password: process.env.DB_PASSWORD || 'fieldpass123',
+// データベースディレクトリの作成
+const dbDir = path.join(__dirname, '../../db');
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+// データベースパス
+const dbPath = process.env.DB_PATH || path.join(dbDir, 'database.db');
+
+// データベースインスタンスの作成
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err);
+  } else {
+    console.log('Connected to SQLite database');
+  }
 });
 
-// 接続テスト
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
-});
+// Promise ベースのクエリ関数
+const query = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve({ rows });
+      });
+    } else {
+      db.run(sql, params, function(err) {
+        if (err) reject(err);
+        else resolve({ 
+          rows: [{ 
+            id: this.lastID,
+            changes: this.changes 
+          }] 
+        });
+      });
+    }
+  });
+};
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
+// トランザクション用のヘルパー関数
+const beginTransaction = () => {
+  return query('BEGIN TRANSACTION');
+};
+
+const commit = () => {
+  return query('COMMIT');
+};
+
+const rollback = () => {
+  return query('ROLLBACK');
+};
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool,
+  query,
+  db,
+  beginTransaction,
+  commit,
+  rollback
 };

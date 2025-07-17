@@ -25,7 +25,7 @@ router.post('/signup', [
 
     // ユーザーの重複チェック
     const existingUser = await db.query(
-      'SELECT id FROM users WHERE email = ? OR user_id = ?',
+      'SELECT id FROM users WHERE email = $1 OR user_id = $2',
       [email, user_id]
     );
 
@@ -40,19 +40,11 @@ router.post('/signup', [
 
     // ユーザーの作成
     const result = await db.query(
-      'INSERT INTO users (email, password_hash, user_id) VALUES (?, ?, ?)',
+      'INSERT INTO users (email, password_hash, user_id) VALUES ($1, $2, $3) RETURNING id, email, user_id',
       [email, hashedPassword, user_id]
     );
 
-    const userId = result.rows[0].id;
-    
-    // 作成したユーザー情報を取得
-    const newUser = await db.query(
-      'SELECT id, email, user_id FROM users WHERE id = ?',
-      [userId]
-    );
-
-    const user = newUser.rows[0];
+    const user = result.rows[0];
     const token = generateToken(user);
 
     res.status(201).json({
@@ -86,7 +78,7 @@ router.post('/login', [
 
     // ユーザーの検索
     const result = await db.query(
-      'SELECT id, email, user_id, password_hash FROM users WHERE user_id = ?',
+      'SELECT id, email, user_id, password_hash FROM users WHERE user_id = $1',
       [user_id]
     );
 
