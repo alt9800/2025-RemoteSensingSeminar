@@ -6,7 +6,10 @@
     <title>道路陥没記録（DuckDB WASM版）</title>
     <script src="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-blocking.js"></script>
+    <script type="module">
+        import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm';
+        window.duckdb = duckdb;
+    </script>
     <style>
         body { margin: 0; font-family: Arial, sans-serif; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
@@ -170,15 +173,22 @@
             
             try {
                 // DuckDB WASMを初期化
-                const DUCKDB_CONFIG = {
-                    query: {
-                        castBigIntToDouble: true,
+                // CDNからWASMファイルを正しく読み込む
+                const MANUAL_BUNDLES = {
+                    mvp: {
+                        mainModule: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-mvp.wasm',
+                        mainWorker: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-mvp.worker.js',
                     },
-                    path: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/',
+                    eh: {
+                        mainModule: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-eh.wasm',
+                        mainWorker: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-eh.worker.js',
+                    },
                 };
                 
-                const bundle = await duckdb.selectBundle(DUCKDB_CONFIG);
-                const worker = await duckdb.createWorker(bundle.mainWorker);
+                // ブラウザに応じてバンドルを選択
+                const bundle = MANUAL_BUNDLES.mvp;
+                
+                const worker = new Worker(bundle.mainWorker);
                 const logger = new duckdb.ConsoleLogger();
                 db = new duckdb.AsyncDuckDB(logger, worker);
                 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);

@@ -395,10 +395,67 @@ Cookie : サーバーと連携するための小さなテキストデータの�
 
 ---
 
-SQLの実行などもできる
+DuckDBの良さ
+
+* 列志向なので読み込み効率が良い。
+* 100万オーダーでも軽快に動く。
+* SQLの流し込みができる。集計などもSQLで済む。
+
+用途
+
+* ストレージサーバに置いてある実体を、クライアント側で処理を行う。
+
+---
+読み込み形式の多様さを生かして、csvの処理を行うことも簡単です。
+```html
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>DuckDB-Wasm Demo</title>
+</head>
+<body>
+    <input type="file" id="file" accept=".csv,.parquet">
+    <button id="run">実行</button>
+    <pre id="log">[/]</pre>
+    <script type="module">
+        import duckdb from '@duckdb/duckdb-wasm';
+        import { Table } from 'apache-arrow';
+        (async () => {
+            const bundles = duckdb.getJsDelivrBundles();
+            const bundle = await duckdb.selectBundle(bundles);
+            const worker = new Worker(bundle.mainWorker);
+            const logger = new duckdb.ConsoleLogger();
+            const db = new duckdb.AsyncDuckDB(logger, worker);
+            await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+            const conn = await db.connect();
+            document.getElementById('run').onclick = async () => {
+                const fileInput = document.getElementById('file');
+                if (!fileInput.files.length) {
+                    alert('ファイルを選択してください');
+                    return;
+                }
+                const file = fileInput.files[0];
+                const buffer = await file.arrayBuffer();
+                await conn.registerFile('input.csv', new Uint8Array(buffer));
+                const res = await conn.query(
+                    "SELECT product, SUM(sales) AS total FROM 'input.csv' GROUP BY product;"
+                );
+                document.getElementById('log').textContent = JSON.stringify(res, null, 2);
+            };
+        })();
+    </script>
+</body>
+</html>
+```
 
 ---
 
+DuckDBはあくまでもインメモリデータベースなので、リロードでデータが揮発します。
+
+データの永続化を考えると、DuckDBで解析を担当し、実体の保存はIndexedDBに任せるのが現実的でしょうか？
+
+---
 
 [Node.jsを使ってファイル書き込みをするパターン](./pseudo-DB/useNodejs/)
 
