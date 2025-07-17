@@ -1,5 +1,21 @@
+## Dockerで動かしたい場合
 
-ディレクトリ構造
+Dockerのクライアントを導入する
+
+https://www.docker.com/get-started/
+
+Docker hubへのログインは必須ではないほか、Docker Desktop以外のクライアントでもよい。
+Limaがお勧めです。PodmanやOrbstack、AppleのDevContainerなどもあります。
+Amazonの Finch なども。
+
+(WSL Ubuntuなどで動かすのであればこれでコマンドラインから導入してもOK!)
+```
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+```
+
+
+## ディレクトリ構造
 
 
 ```

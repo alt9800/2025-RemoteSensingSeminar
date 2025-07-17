@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSVをパースして、テーブルの要素から緯度経度設定を行う例</title>
+    <script src='https://unpkg.com/maplibre-gl@3.1.0/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@3.1.0/dist/maplibre-gl.css' rel='stylesheet' />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+        #sidebar {
+            width: 350px;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="file"], select, button {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+        }
+        .success {
+            color: #28a745;
+            margin-top: 10px;
+        }
+        #dataPreview {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .maplibregl-popup {
+            max-width: 300px;
+        }
+        .popup-content h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .popup-content p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="sidebar">
+            <h2>地理空間CSVマッパー</h2>
+            
+            <div class="input-group">
+                <label for="csvFile">CSVファイルを選択:</label>
+                <input type="file" id="csvFile" accept=".csv">
+                <div id="dropZone" style="margin-top: 10px; padding: 30px; border: 2px dashed #ddd; border-radius: 8px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease;">
+                    <p style="margin: 0; color: #666;">ここにCSVファイルをドラッグ&ドロップ<br>または上のボタンから選択</p>
+                </div>
+            </div>
+            
+            <div id="columnSelectors" style="display: none;">
+                <div class="input-group">
+                    <label for="latColumn">緯度の列:</label>
+                    <select id="latColumn"></select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="lngColumn">経度の列:</label>
+                    <select id="lngColumn"></select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="labelColumn">ラベルの列:</label>
+                    <select id="labelColumn"></select>
+                </div>
+                
+                <button id="plotButton" onclick="plotData()">地図にプロット</button>
+            </div>
+            
+            <div id="message"></div>
+            
+            <div id="dataPreview"></div>
+        </div>
+        
+        <div id="map"></div>
+    </div>
+
+    <script>
+        let map;
+        let csvData = [];
+        let markers = [];
+        
+        // 地図の初期化
+        function initMap() {
+            map = new maplibregl.Map({
+                container: 'map',
+                style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+                center: [139.6917, 35.6895], // 東京
+                zoom: 5
+            });
+            
+            map.addControl(new maplibregl.NavigationControl());
+        }
+        
+        // CSVファイルの解析処理
+        function parseCSVFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const text = e.target.result;
+                
+                // まず標準的な設定で試す
+                Papa.parse(text, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    delimiter: ',',
+                    newline: '',  // 自動検出
+                    quoteChar: '"',
+                    escapeChar: '"',
+                    complete: function(results) {
+                        // エラーがある場合は、カスタム処理を試みる
+                        if (results.errors.length > 0 && results.data.length <= 1) {
+                            console.log('標準パースでエラー発生。カスタム処理を実行します。');
+                            parseWithCustomProcessing(text);
+                        } else {
+                            csvData = results.data;
+                            console.log('読み込まれたデータ数:', csvData.length);
+                            displayColumnSelectors(results.meta.fields);
+                            displayDataPreview();
+                            showMessage(`CSVファイルを読み込みました。(${csvData.length}件)`, 'success');
+                        }
+                    },
+                    error: function(error) {
+                        console.log('パースエラー:', error);
+                        // エラーが発生してもカスタム処理を試みる
+                        parseWithCustomProcessing(text);
+                    }
+                });
+            };
+            
+            reader.readAsText(file, 'UTF-8');
+        }
+        
+        // カスタムCSV処理（問題のあるCSVファイル用）
+        function parseWithCustomProcessing(text) {
+            try {
+                // 改行を含む可能性のある備考フィールドを特別に処理
+                // まず、備考フィールド内の改行を一時的に置換
+                const processedText = text.replace(/(\r?\n)(?=(?:[^"]*"[^"]*")*[^"]*$)/g, ' ');
+                
+                // 再度パース
+                Papa.parse(processedText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    delimiter: ',',
+                    complete: function(results) {
+                        csvData = results.data;
+                        console.log('カスタム処理で読み込まれたデータ数:', csvData.length);
+                        
+                        if (csvData.length > 1) {
+                            displayColumnSelectors(results.meta.fields);
+                            displayDataPreview();
+                            showMessage(`CSVファイルを読み込みました。(${csvData.length}件)`, 'success');
+                        } else {
+                            // それでもダメな場合は、行ごとに処理
+                            parseLineByLine(text);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('カスタム処理エラー:', error);
+                showMessage('CSVファイルの読み込みに失敗しました。ファイル形式を確認してください。', 'error');
+            }
+        }
+        
+        // 行ごとの処理（最終手段）
+        function parseLineByLine(text) {
+            try {
+                const lines = text.split(/\r?\n/);
+                if (lines.length < 2) {
+                    showMessage('CSVファイルにデータが含まれていません。', 'error');
+                    return;
+                }
+                
+                // ヘッダー行を取得
+                const headers = Papa.parse(lines[0]).data[0];
+                csvData = [];
+                
+                // データ行を処理
+                let currentRow = '';
+                let inQuotes = false;
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i];
+                    
+                    // クォート内かどうかを追跡
+                    const quoteCount = (line.match(/"/g) || []).length;
+                    
+                    if (!inQuotes && quoteCount % 2 === 0) {
+                        // 通常の行
+                        if (line.trim()) {
+                            const parsed = Papa.parse(line).data[0];
+                            if (parsed && parsed.length === headers.length) {
+                                const row = {};
+                                headers.forEach((header, index) => {
+                                    row[header] = parsed[index];
+                                });
+                                csvData.push(row);
+                            }
+                        }
+                    } else {
+                        // 複数行にまたがるフィールドの処理
+                        if (!inQuotes) {
+                            currentRow = line;
+                            inQuotes = true;
+                        } else {
+                            currentRow += '\n' + line;
+                        }
+                        
+                        // 行が完結したかチェック
+                        const totalQuotes = (currentRow.match(/"/g) || []).length;
+                        if (totalQuotes % 2 === 0) {
+                            inQuotes = false;
+                            const parsed = Papa.parse(currentRow).data[0];
+                            if (parsed && parsed.length === headers.length) {
+                                const row = {};
+                                headers.forEach((header, index) => {
+                                    row[header] = parsed[index];
+                                });
+                                csvData.push(row);
+                            }
+                            currentRow = '';
+                        }
+                    }
+                }
+                
+                console.log('行ごと処理で読み込まれたデータ数:', csvData.length);
+                displayColumnSelectors(headers);
+                displayDataPreview();
+                showMessage(`CSVファイルを読み込みました。(${csvData.length}件)`, 'success');
+                
+            } catch (error) {
+                console.error('行ごと処理エラー:', error);
+                showMessage('CSVファイルの読み込みに失敗しました。', 'error');
+            }
+        }
+        
+        // CSVファイルの読み込み
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            parseCSVFile(file);
+        });
+        
+        // ドラッグ&ドロップの設定
+        const dropZone = document.getElementById('dropZone');
+        
+        // ドラッグオーバー時のスタイル変更
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.backgroundColor = '#e0e0e0';
+            this.style.borderColor = '#999';
+        });
+        
+        // ドラッグリーブ時のスタイル復元
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.backgroundColor = '#f9f9f9';
+            this.style.borderColor = '#ddd';
+        });
+        
+        // ドロップ時の処理
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.backgroundColor = '#f9f9f9';
+            this.style.borderColor = '#ddd';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    parseCSVFile(file);
+                    // ファイル選択inputにも反映
+                    document.getElementById('csvFile').files = files;
+                } else {
+                    showMessage('CSVファイルを選択してください。', 'error');
+                }
+            }
+        });
+        
+        // クリックでファイル選択ダイアログを開く
+        dropZone.addEventListener('click', function() {
+            document.getElementById('csvFile').click();
+        });
+        
+        // 列選択の表示
+        function displayColumnSelectors(columns) {
+            const selectors = ['latColumn', 'lngColumn', 'labelColumn'];
+            
+            selectors.forEach(selectorId => {
+                const select = document.getElementById(selectorId);
+                select.innerHTML = '<option value="">選択してください</option>';
+                
+                columns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column;
+                    option.textContent = column;
+                    select.appendChild(option);
+                });
+            });
+            
+            document.getElementById('columnSelectors').style.display = 'block';
+        }
+        
+        // データプレビューの表示
+        function displayDataPreview() {
+            const preview = document.getElementById('dataPreview');
+            const previewData = csvData.slice(0, 5);
+            
+            if (previewData.length === 0) {
+                preview.innerHTML = '<p>データがありません</p>';
+                return;
+            }
+            
+            let html = '<h3>データプレビュー (最初の5行)</h3><table><tr>';
+            
+            // ヘッダー
+            Object.keys(previewData[0]).forEach(key => {
+                html += `<th>${key}</th>`;
+            });
+            html += '</tr>';
+            
+            // データ行
+            previewData.forEach(row => {
+                html += '<tr>';
+                Object.values(row).forEach(value => {
+                    html += `<td>${value !== null ? value : ''}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            preview.innerHTML = html;
+        }
+        
+        // データのプロット
+        function plotData() {
+            const latColumn = document.getElementById('latColumn').value;
+            const lngColumn = document.getElementById('lngColumn').value;
+            const labelColumn = document.getElementById('labelColumn').value;
+            
+            if (!latColumn || !lngColumn || !labelColumn) {
+                showMessage('すべての列を選択してください。', 'error');
+                return;
+            }
+            
+            // 既存のマーカーを削除
+            markers.forEach(marker => marker.remove());
+            markers = [];
+            
+            let validPoints = 0;
+            let invalidPoints = 0;
+            const bounds = new maplibregl.LngLatBounds();
+            
+            csvData.forEach((row, index) => {
+                // 緯度経度の値を取得して検証
+                const latValue = row[latColumn];
+                const lngValue = row[lngColumn];
+                
+                // 空の値、null、undefinedをチェック
+                if (latValue === null || latValue === undefined || latValue === '' ||
+                    lngValue === null || lngValue === undefined || lngValue === '') {
+                    invalidPoints++;
+                    return;
+                }
+                
+                // 数値に変換
+                const lat = parseFloat(latValue);
+                const lng = parseFloat(lngValue);
+                const label = row[labelColumn] || `Point ${index + 1}`;
+                
+                // 有効な緯度経度かチェック
+                if (!isNaN(lat) && !isNaN(lng) && 
+                    lat >= -90 && lat <= 90 && 
+                    lng >= -180 && lng <= 180) {
+                    
+                    // ポップアップの内容を作成
+                    let popupHtml = '<div class="popup-content">';
+                    popupHtml += `<h3>${label}</h3>`;
+                    
+                    // すべての列のデータを表示
+                    Object.entries(row).forEach(([key, value]) => {
+                        if (value !== null && value !== undefined && value !== '') {
+                            popupHtml += `<p><strong>${key}:</strong> ${value}</p>`;
+                        }
+                    });
+                    
+                    popupHtml += '</div>';
+                    
+                    // マーカーの作成
+                    const marker = new maplibregl.Marker({
+                        color: '#007bff'
+                    })
+                    .setLngLat([lng, lat])
+                    .setPopup(new maplibregl.Popup().setHTML(popupHtml))
+                    .addTo(map);
+                    
+                    markers.push(marker);
+                    bounds.extend([lng, lat]);
+                    validPoints++;
+                } else {
+                    invalidPoints++;
+                }
+            });
+            
+            if (validPoints > 0) {
+                // 地図をマーカーに合わせてズーム
+                map.fitBounds(bounds, { padding: 50 });
+                showMessage(`${validPoints}個の地点をプロットしました。${invalidPoints > 0 ? `(${invalidPoints}個の無効なデータをスキップ)` : ''}`, 'success');
+            } else {
+                showMessage(`有効な緯度・経度データが見つかりませんでした。(${invalidPoints}個の無効なデータ)`, 'error');
+            }
+        }
+        
+        // メッセージ表示
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = type;
+            
+            setTimeout(() => {
+                messageEl.textContent = '';
+                messageEl.className = '';
+            }, 5000);
+        }
+        
+        // 地図の初期化
+        initMap();
+    </script>
+</body>
+</html>
