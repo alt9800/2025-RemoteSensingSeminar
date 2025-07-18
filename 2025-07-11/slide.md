@@ -78,7 +78,7 @@ Node.jsが動く環境設定 / MapLibreの読み込み方
 13:30-13:50	最終的にはこういうのをつくるよ、という例 (Docker実装)
 13:50-14:30 実装解説 
 14:30-14:40	-----(休憩)-----
-14:40-15:30 擬似ファイル読み込みの例いろいろ
+14:40-15:30 擬似データ永続化の例いろいろ
 15:30-16:00 MapLibreの基本機能を見ていこう (アイコンの表示、ラインの表示など)
 
 
@@ -325,6 +325,10 @@ C# のASP / JavaのSpring / Ruby on Rails / PHPのLaravel などもMVCのアー�
 
 ## [IndexedDB](./pseudo-DB/useIndexedDB/)
 
+![w:800](assets/image15.png)
+
+---
+
 この様な感じでデータが格納されます。
 ```json
 {id: "1752792726584", coordinates: [139.70377655029148, 35.728154509073775], timestamp: "2025-07-17T22:52:06.584Z", description: "test", imageBlob: File}
@@ -370,6 +374,8 @@ DBのドメイン/
 
 ##  [LocalStorage](./pseudo-DB/useLocalStorage/)
 
+![w:500](assets/image13.png)
+![w:500](assets/image14.png)
 
 ---
 
@@ -396,8 +402,7 @@ Cookie : サーバーと連携するための小さなテキストデータの�
 
 ##  [DuckDB](./pseudo-DB/useDuckDB/)
 
-ブラウザでSQLを利用することができます。
-https://duckdb.org/docs/stable/clients/wasm/overview.html
+![w:800](assets/image12.png)
 
 ---
 
@@ -410,6 +415,10 @@ DuckDBの良さ
 用途
 
 * ストレージサーバに置いてある実体を、クライアント側で処理を行う。
+
+ブラウザでSQLを利用することができます。
+https://duckdb.org/docs/stable/clients/wasm/overview.html
+
 
 ---
 読み込み形式の多様さを生かして、csvの処理を行うことも簡単です。
@@ -471,7 +480,14 @@ https://zenn.dev/shiguredo/articles/duckdb-wasm-s3-parquet-opfs
 
 [Node.jsを使ってファイル書き込みをするパターン](./pseudo-DB/useNodejs/)
 
+![w:800](assets/image11.png)
 
+---
+
+これはローカルにDLして使ってみてください。
+
+
+標準ライブラリのみで実装されており、ローカルのGeoJSON(potholes.geojson)にデータを保存し、地図上には、このGeoJSONを読み込みします。
 
 
 ---
