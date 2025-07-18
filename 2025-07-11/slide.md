@@ -337,6 +337,7 @@ C# のASP / JavaのSpring / Ruby on Rails / PHPのLaravel などもMVCのアー�
 ```
 などローカルにデータベースが存在している格好です。
 
+☝️ ブラウザの開発者ツールから、保存実体を確認してみましょう！
 
 ---
 
@@ -362,7 +363,7 @@ DBのドメイン/
 
 この辺りは**LocalStorage**だけでは叶えられないポイントでもあります。
 
-
+次の項目へ...
 
 
 ---
@@ -376,7 +377,10 @@ LocalStorageはブラウザにもよりますが、保存領域は*オリジン�
 
 IndexedDBであっても、Localstorageであっても、「Cookieとサイトデータ削除」すると、すべてのデータが削除されます。
 
-IndexedDBは永続化(ロック)のような仕組みもある。
+IndexedDBは永続化(ロック)のような仕組みもあります。
+
+
+☝️ ブラウザの開発者ツールから、保存実体を確認してみましょう！
 
 ---
 
@@ -392,6 +396,8 @@ Cookie : サーバーと連携するための小さなテキストデータの�
 
 ##  [DuckDB](./pseudo-DB/useDuckDB/)
 
+ブラウザでSQLを利用することができます。
+https://duckdb.org/docs/stable/clients/wasm/overview.html
 
 ---
 
@@ -454,6 +460,12 @@ DuckDBの良さ
 DuckDBはあくまでもインメモリデータベースなので、リロードでデータが揮発します。
 
 データの永続化を考えると、DuckDBで解析を担当し、実体の保存はIndexedDBに任せるのが現実的でしょうか？
+
+実用例
+https://zenn.dev/shiguredo/articles/duckdb-wasm-s3-parquet-opfs
+
+参考
+[DuckDB-Wasm の HTMLファイルのみで試せる公式サンプルを書きかえたりもして試す #JavaScript - Qiita](https://qiita.com/youtoy/items/bbdd13585577119592b3)
 
 ---
 
