@@ -332,6 +332,31 @@
                     const styleResponse = await fetch(styleUrl);
                     const styleJson = await styleResponse.json();
                     
+                    // ソースURLを絶対URLに変換
+                    if (styleJson.sources) {
+                        Object.keys(styleJson.sources).forEach(key => {
+                            const source = styleJson.sources[key];
+                            if (source.tiles) {
+                                source.tiles = source.tiles.map(tile => {
+                                    if (tile.startsWith('/')) {
+                                        return 'https://tile.openstreetmap.jp' + tile;
+                                    }
+                                    return tile;
+                                });
+                            }
+                        });
+                    }
+                    
+                    // スプライトURLを絶対URLに変換
+                    if (styleJson.sprite && styleJson.sprite.startsWith('/')) {
+                        styleJson.sprite = 'https://tile.openstreetmap.jp' + styleJson.sprite;
+                    }
+                    
+                    // グリフURLを絶対URLに変換
+                    if (styleJson.glyphs && styleJson.glyphs.startsWith('/')) {
+                        styleJson.glyphs = 'https://tile.openstreetmap.jp' + styleJson.glyphs;
+                    }
+                    
                     // スタイルをIndexedDBに保存
                     const transaction = db.transaction(['styles'], 'readwrite');
                     const store = transaction.objectStore('styles');
@@ -350,6 +375,7 @@
                         await this.cacheResource(spriteUrl + '@2x.json');
                     }
                     
+                    console.log('スタイルのキャッシュ完了');
                     return styleJson;
                 } catch (error) {
                     console.error('スタイルのキャッシュに失敗:', error);
@@ -394,6 +420,7 @@
                 
                 const totalTiles = tiles.length;
                 let cachedTiles = 0;
+                let failedTiles = 0;
                 
                 cacheDetail.textContent = `${totalTiles}枚のタイルをキャッシュします`;
                 
@@ -404,8 +431,17 @@
                     
                     await Promise.all(batch.map(async (tile) => {
                         try {
-                            const url = `https://tile.openstreetmap.jp/${tile.z}/${tile.x}/${tile.y}.png`;
-                            const response = await fetch(url);
+                            // OpenStreetMapの正しいタイルURL形式
+                            const url = `https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`;
+                            const response = await fetch(url, {
+                                mode: 'cors',
+                                credentials: 'omit'
+                            });
+                            
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            
                             const blob = await response.blob();
                             
                             // IndexedDBに保存
@@ -419,16 +455,21 @@
                             });
                             
                             cachedTiles++;
-                            const percent = Math.round((cachedTiles / totalTiles) * 100);
-                            progress.textContent = `キャッシュ中: ${percent}% (${cachedTiles}/${totalTiles})`;
                             
                         } catch (error) {
                             console.error(`タイルのキャッシュに失敗: ${tile.z}/${tile.x}/${tile.y}`, error);
+                            failedTiles++;
                         }
+                        
+                        const percent = Math.round(((cachedTiles + failedTiles) / totalTiles) * 100);
+                        progress.textContent = `キャッシュ中: ${percent}% (成功:${cachedTiles} / 失敗:${failedTiles} / 全体:${totalTiles})`;
                     }));
+                    
+                    // レート制限対策で少し待機
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 
-                cacheDetail.textContent = `${cachedTiles}枚のタイルをキャッシュしました`;
+                cacheDetail.textContent = `${cachedTiles}枚のタイルをキャッシュしました（失敗: ${failedTiles}枚）`;
                 await this.updateCacheInfo();
                 
                 return cachedTiles;
@@ -512,36 +553,83 @@
         async function setupOfflineProtocol() {
             if (!map) return;
             
-            map.on('dataloading', async (e) => {
-                if (e.sourceDataType === 'raster' && !navigator.onLine) {
-                    // オフライン時はIndexedDBからタイルを読み込む
-                    const url = e.tile?.url;
-                    if (url) {
+            // タイル読み込み前のイベントでキャッシュをチェック
+            map.on('dataloading', (e) => {
+                if (e.sourceDataType !== 'raster-dem' && e.sourceDataType !== 'raster') return;
+                if (!e.tile || !e.tile.url) return;
+                
+                const originalUrl = e.tile.url;
+                
+                // オフライン時はキャッシュから読み込む
+                if (!navigator.onLine || isOfflineMode) {
+                    // 非同期でキャッシュを確認
+                    (async () => {
                         try {
                             const transaction = db.transaction(['tiles'], 'readonly');
                             const store = transaction.objectStore('tiles');
-                            const tileData = await store.get(url);
+                            const tileData = await store.get(originalUrl);
                             
                             if (tileData && tileData.blob) {
-                                // キャッシュからタイルを提供
+                                // タイルが既に読み込まれている場合はスキップ
+                                if (e.tile.state === 'loaded' || e.tile.state === 'reloading') return;
+                                
+                                // Blob URLを作成
                                 const objectUrl = URL.createObjectURL(tileData.blob);
-                                e.tile.url = objectUrl;
+                                
+                                // タイルのURLを更新して再読み込み
+                                if (e.tile.actor) {
+                                    e.tile.url = objectUrl;
+                                    e.tile.state = 'loading';
+                                    e.tile.loadVectorData(null, map.painter);
+                                }
+                                
+                                console.log('キャッシュからタイルを読み込み:', originalUrl);
+                            } else {
+                                console.warn('タイルがキャッシュにありません:', originalUrl);
                             }
                         } catch (error) {
-                            console.error('タイルの読み込みエラー:', error);
+                            console.error('タイル読み込みエラー:', error);
                         }
+                    })();
+                }
+            });
+            
+            // エラーハンドリング
+            map.on('error', (e) => {
+                if (e.error && e.error.status === 404) {
+                    console.warn('リソースが見つかりません:', e.error.url);
+                    // 404エラーは無視（オフライン時は想定内）
+                    if (!navigator.onLine || isOfflineMode) {
+                        e.preventDefault();
                     }
                 }
             });
         }
         
         // オンライン/オフライン状態の管理（改善版）
-        function updateOnlineStatus() {
+        async function updateOnlineStatus() {
             const status = document.getElementById('status');
             const statusText = document.getElementById('status-text');
             const syncBtn = document.getElementById('sync-data');
             
+            // navigator.onLineは信頼できないので、実際にネットワークテストを行う
+            let isOnline = false;
+            
             if (navigator.onLine) {
+                // 実際にネットワークに接続できるかテスト
+                try {
+                    const response = await fetch('https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json', {
+                        method: 'HEAD',
+                        mode: 'no-cors',
+                        cache: 'no-store'
+                    });
+                    isOnline = true;
+                } catch (error) {
+                    isOnline = false;
+                }
+            }
+            
+            if (isOnline) {
                 status.className = 'status online';
                 statusText.textContent = 'オンライン';
                 syncBtn.disabled = false;
@@ -552,16 +640,22 @@
                     isOfflineMode = false;
                     showNotification('オンラインに復帰しました', 'success');
                 }
+                isOfflineMode = false;
             } else {
                 status.className = 'status offline';
                 statusText.textContent = 'オフライン（キャッシュモード）';
                 syncBtn.disabled = true;
                 syncBtn.style.opacity = '0.5';
                 
-                isOfflineMode = true;
-                showNotification('オフラインモードで動作中', 'warning');
+                if (!isOfflineMode) {
+                    isOfflineMode = true;
+                    showNotification('オフラインモードで動作中', 'warning');
+                }
             }
         }
+        
+        // 定期的にオンライン状態をチェック（30秒間隔）
+        setInterval(updateOnlineStatus, 30000);
         
         // 通知表示
         function showNotification(message, type = 'info') {
@@ -608,17 +702,55 @@
         // 地図の初期化（オフライン対応版）
         async function initMap() {
             try {
-                // オフライン時でもマップを初期化
+                // キャッシュされたスタイルがあるか確認
+                let styleUrl = 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json';
+                let styleData = null;
+                
+                if (!navigator.onLine || isOfflineMode) {
+                    try {
+                        const transaction = db.transaction(['styles'], 'readonly');
+                        const store = transaction.objectStore('styles');
+                        const cached = await store.get(styleUrl);
+                        
+                        if (cached && cached.data) {
+                            styleData = cached.data;
+                            console.log('キャッシュされたスタイルを使用');
+                        }
+                    } catch (error) {
+                        console.error('スタイルキャッシュの読み込みエラー:', error);
+                    }
+                }
+                
+                // transformRequest関数を定義
+                const transformRequest = (url, resourceType) => {
+                    // デバッグ用ログ
+                    console.log(`Request: ${resourceType} - ${url}`);
+                    
+                    // オフライン時のみキャッシュから読み込む
+                    if (!navigator.onLine || isOfflineMode) {
+                        // タイルの場合は非同期でキャッシュチェック
+                        if (resourceType === 'Tile' && url.includes('.png')) {
+                            // MapLibreは同期的な返り値を期待するため、
+                            // ここではURLをそのまま返し、後でインターセプトする
+                            return { url };
+                        }
+                    }
+                    
+                    return { url };
+                };
+                
+                // マップを初期化
                 map = new maplibregl.Map({
                     container: 'map',
-                    style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+                    style: styleData || styleUrl,
                     center: [131.15, 34.0],
                     zoom: 10,
                     hash: true,
                     maxBounds: [
-                        [130.5, 33.5],  // より広い範囲
+                        [130.5, 33.5],
                         [131.8, 34.5]
-                    ]
+                    ],
+                    transformRequest: transformRequest
                 });
                 
                 // オフラインプロトコルの設定
@@ -630,6 +762,7 @@
                 // オフライン時の代替表示
                 document.getElementById('offline-map').style.display = 'block';
                 document.getElementById('map').style.display = 'none';
+                showNotification('地図の読み込みに失敗しました。キャッシュを確認してください。', 'error');
             }
         }
         
