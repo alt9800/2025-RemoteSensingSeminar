@@ -1,0 +1,47 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.621225,
+          35.919076
+        ]
+      },
+      "properties": {
+        "id": 1,
+        "name": "府中"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          140.265962,
+          36.344161
+        ]
+      },
+      "properties": {
+        "id": 2,
+        "name": "霞ヶ浦"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          140.417278,
+          35.908419
+        ]
+      },
+      "properties": {
+        "id": 3,
+        "name": "江戸城跡"
+      }
+    }
+  ]
+}

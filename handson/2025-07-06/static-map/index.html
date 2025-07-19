@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ファンタジーマップ攻略チェッカー</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: normal;
+        }
+        
+        #map {
+            height: 600px;
+            background: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* シンプルなマーカー */
+        .location-marker {
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .location-marker.completed {
+            background: #10b981;
+            opacity: 0.7;
+        }
+        
+        .location-marker:hover {
+            transform: scale(1.2);
+        }
+        
+        /* ポップアップ */
+        .leaflet-popup-content-wrapper {
+            border-radius: 4px;
+        }
+        
+        .leaflet-popup-content {
+            margin: 8px 12px;
+            line-height: 1.4;
+        }
+        
+        .popup-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .popup-desc {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* プログレスバー */
+        .progress-container {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        /* リセットボタン */
+        .reset-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .reset-btn:hover {
+            background: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ファンタジーマップ - 攻略進行チェッカー</h1>
+        
+        <div id="map"></div>
+        
+        <div class="progress-container">
+            <div class="progress-text">
+                <span>攻略進行度</span>
+                <span id="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-text">
+                <span id="progress-count">0 / 0 箇所クリア</span>
+                <button class="reset-btn" onclick="resetProgress()">進行状況をリセット</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    
+    <script>
+        // マップの初期化
+        const map = L.map('map', {
+            crs: L.CRS.Simple,
+            minZoom: -1,
+            maxZoom: 2,
+            zoom: 0,
+            attributionControl: false
+        });
+        
+        // 画像のサイズと境界を設定
+        const imageWidth = 2048;
+        const imageHeight = 2048;
+        const bounds = [[0, 0], [imageHeight, imageWidth]];
+        
+        // ファンタジーマップ画像を追加
+        L.imageOverlay('fantasy.png', bounds).addTo(map);
+        map.fitBounds(bounds);
+        
+        // 攻略ポイントのデータ
+        const locations = [
+            { id: 1, name: "始まりの村", desc: "冒険の出発点", pos: [1600, 400], order: 1 },
+            { id: 2, name: "森の神殿", desc: "最初の試練", pos: [1400, 600], order: 2 },
+            { id: 3, name: "川の砦", desc: "橋を守る要塞", pos: [1200, 800], order: 3 },
+            { id: 4, name: "古の遺跡", desc: "謎の石碑がある", pos: [1000, 1000], order: 4 },
+            { id: 5, name: "山岳の城", desc: "ドラゴンの住処", pos: [800, 1200], order: 5 },
+            { id: 6, name: "魔法都市", desc: "賢者との出会い", pos: [600, 1400], order: 6 },
+            { id: 7, name: "氷の宮殿", desc: "凍てつく試練", pos: [400, 1600], order: 7 },
+            { id: 8, name: "最果ての塔", desc: "最終決戦の地", pos: [1000, 400], order: 8 }
+        ];
+        
+        // 進行状況の管理
+        let progress = JSON.parse(localStorage.getItem('mapProgress')) || {};
+        
+        // カスタムアイコン
+        const createIcon = (completed) => {
+            return L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="location-marker ${completed ? 'completed' : ''}"></div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+                popupAnchor: [0, -12]
+            });
+        };
+        
+        // マーカーの追加
+        const markers = {};
+        locations.forEach(loc => {
+            const marker = L.marker(loc.pos, {
+                icon: createIcon(progress[loc.id])
+            }).addTo(map);
+            
+            marker.bindPopup(`
+                <div class="popup-title">${loc.name}</div>
+                <div class="popup-desc">${loc.desc}</div>
+                <div class="popup-desc" style="margin-top: 8px; font-style: italic;">
+                    推奨攻略順: ${loc.order}番目
+                </div>
+            `);
+            
+            marker.on('click', () => toggleLocation(loc.id));
+            markers[loc.id] = marker;
+        });
+        
+        // ロケーションの完了状態を切り替え
+        function toggleLocation(id) {
+            progress[id] = !progress[id];
+            localStorage.setItem('mapProgress', JSON.stringify(progress));
+            
+            // マーカーのアイコンを更新
+            markers[id].setIcon(createIcon(progress[id]));
+            
+            updateProgressBar();
+        }
+        
+        // プログレスバーの更新
+        function updateProgressBar() {
+            const completed = Object.values(progress).filter(v => v).length;
+            const total = locations.length;
+            const percentage = Math.round((completed / total) * 100);
+            
+            document.getElementById('progress-fill').style.width = `${percentage}%`;
+            document.getElementById('progress-percent').textContent = `${percentage}%`;
+            document.getElementById('progress-count').textContent = `${completed} / ${total} 箇所クリア`;
+        }
+        
+        // 進行状況のリセット
+        function resetProgress() {
+            if (confirm('進行状況をリセットしますか？')) {
+                progress = {};
+                localStorage.removeItem('mapProgress');
+                
+                // すべてのマーカーを未完了状態に
+                locations.forEach(loc => {
+                    markers[loc.id].setIcon(createIcon(false));
+                });
+                
+                updateProgressBar();
+            }
+        }
+        
+        // 初期表示
+        updateProgressBar();
+        
+        // 推奨ルートの線を描画（オプション）
+        const routeCoords = locations
+            .sort((a, b) => a.order - b.order)
+            .map(loc => loc.pos);
+        
+        L.polyline(routeCoords, {
+            color: '#3b82f6',
+            weight: 2,
+            opacity: 0.3,
+            dashArray: '10, 10'
+        }).addTo(map);
+    </script>
+</body>
+</html>
