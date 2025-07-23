@@ -30,6 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
           npm install -g @marp-team/marp-cli
+          # Markdown to HTML converter
+          npm install -g markdown-it markdown-it-emoji markdown-it-highlightjs markdown-it-anchor
 
       - name: Build all materials
         run: |
@@ -45,6 +47,12 @@ jobs:
             if [ -f "$DATE_DIR/slide.md" ]; then
               echo "- Generating slides..."
               
+              # デバッグ：画像ファイルの存在確認
+              echo "  Images in $DATE_DIR:"
+              find "$DATE_DIR" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) | while read img; do
+                echo "    - $(basename "$img")"
+              done
+              
               # アセットディレクトリを作成
               mkdir -p "output/slides/$DATE_DIR"
               
@@ -56,13 +64,15 @@ jobs:
               # 画像ファイルをコピー
               find "$DATE_DIR" -maxdepth 1 -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) -exec cp {} "output/slides/$DATE_DIR/" \;
               
-              # Marpでスライド生成（シンプルなコマンド）
-              cd "$DATE_DIR" && marp slide.md -o "../output/slides/$DATE_DIR.html" --html && cd ..
-              cd "$DATE_DIR" && marp slide.md -o "../output/slides/$DATE_DIR.pdf" --pdf && cd ..
+              # PDFはMarpで生成
+              echo "  Generating PDF..."
+              cd "$DATE_DIR" && marp slide.md -o slide.pdf --pdf --allow-local-files && cd ..
+              mv "$DATE_DIR/slide.pdf" "output/slides/$DATE_DIR.pdf"
               
-              # HTMLの画像パスを修正
-              sed -i "s|src=\"\([^\"]*\)\"|src=\"$DATE_DIR/\1\"|g" "output/slides/$DATE_DIR.html"
-              sed -i "s|src=\"assets/|src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.html"
+              # HTMLはMarkdownをGitHubスタイルで変換
+              echo "  Generating HTML (GitHub style)..."
+              cp "$DATE_DIR/slide.md" "output/slides/$DATE_DIR.md"
+            fi
             fi
             
             # ハンズオン資料をコピー
@@ -159,7 +169,7 @@ jobs:
               echo "  <h2>📅 $DATE_DIR</h2>" >> output/index.html
               echo "  <div class=\"links\">" >> output/index.html
               
-              [ -f "output/slides/$DATE_DIR.html" ] && echo "    <a href=\"slides/$DATE_DIR.html\">📊 スライド (HTML)</a>" >> output/index.html
+              [ -f "output/slides/$DATE_DIR.md" ] && echo "    <a href=\"slides/$DATE_DIR.md\">📝 スライド (Markdown)</a>" >> output/index.html
               [ -f "output/slides/$DATE_DIR.pdf" ] && echo "    <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> output/index.html
               [ -d "output/handson/$DATE_DIR" ] && echo "    <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> output/index.html
               

@@ -174,7 +174,6 @@ npm install --save-dev nodemon
 ---
 
 
-
 ---
 
 ```
@@ -323,6 +322,9 @@ node scripts/init-db.js
 リクエスト → [ミドルウェア1] → [ミドルウェア2] → [ルートハンドラ] → レスポンス
 ```
 の様な処理がある際に、リクエストとレスポンスの間の処理を行うものをWebにおけるミドルウェアとして扱います。
+
+
+(ミドルウェアという語がいろいろなところで使われてややこしいかもしれません。)
 
 ---
 `src/middleware/auth.js` : JWT認証
@@ -841,6 +843,15 @@ curl -X GET http://localhost:3000/api/users/me \
 
 ---
 
+## 講義中に触れたAPI Callを便利にするツールはこの辺り
+実際にバックエンド開発ではよく使われています。
+
+[HTTPie – API testing client that flows with you](https://httpie.io/)
+
+[Postmanをダウンロード | 無料で始める](https://www.postman.com/jp/downloads/)
+
+
+---
 
 
 ### 原始的に、セッションはどのように管理されていたか (Apacheとサーブレットを例に)
@@ -1040,6 +1051,11 @@ Tbls (リレーション可視化ツール)
 
 ---
 
+MacのSafariの例ではあるが、試験的な機能の有効化が必要な場合もあるかもしれません。
+
+![alt text](assets/image1.png)
+
+---
 
 FileAPIが行けるのでは...?
 
