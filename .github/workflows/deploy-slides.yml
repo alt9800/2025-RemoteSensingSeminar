@@ -65,9 +65,21 @@ jobs:
               echo "  Copying Markdown..."
               cp "$DATE_DIR/slide.md" "output/slides/$DATE_DIR.md"
               
-              # 画像パスを調整（相対パスから適切なパスへ）
-              sed -i "s|!\[\([^]]*\)\](\(assets/[^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
-              sed -i "s|!\[\([^]]*\)\](\([^/)][^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
+              # Markdown記法の画像パスを調整
+              # assets/image.png → 2025-06-20/assets/image.png
+              sed -i "s|!\[\([^]]*\)\](assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" "output/slides/$DATE_DIR.md"
+              # ./assets/image.png → 2025-06-20/assets/image.png
+              sed -i "s|!\[\([^]]*\)\](./assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" "output/slides/$DATE_DIR.md"
+              # image.png → 2025-06-20/image.png (assetsディレクトリ以外の画像)
+              sed -i "s|!\[\([^]]*\)\](\([^/:)][^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
+              
+              # HTMLタグの画像パスも調整（もし使われている場合）
+              sed -i "s|<img\([^>]*\)src=\"assets/|<img\1src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.md"
+              sed -i "s|<img\([^>]*\)src=\"./assets/|<img\1src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.md"
+              sed -i "s|<img\([^>]*\)src=\"\([^/:\"]*\)\"|<img\1src=\"$DATE_DIR/\2\"|g" "output/slides/$DATE_DIR.md"
+              
+              # 重複を防ぐ（既に日付ディレクトリが含まれている場合）
+              sed -i "s|$DATE_DIR/$DATE_DIR|$DATE_DIR|g" "output/slides/$DATE_DIR.md"
             fi
             
             # ハンズオン資料をコピー
