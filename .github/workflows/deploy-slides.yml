@@ -45,12 +45,6 @@ jobs:
             if [ -f "$DATE_DIR/slide.md" ]; then
               echo "- Generating slides..."
               
-              # デバッグ：画像ファイルの存在確認
-              echo "  Images in $DATE_DIR:"
-              find "$DATE_DIR" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" \) | while read img; do
-                echo "    - $(basename "$img")"
-              done
-              
               # アセットディレクトリを作成
               mkdir -p "output/slides/$DATE_DIR"
               
@@ -67,10 +61,13 @@ jobs:
               cd "$DATE_DIR" && marp slide.md -o slide.pdf --pdf --allow-local-files && cd ..
               mv "$DATE_DIR/slide.pdf" "output/slides/$DATE_DIR.pdf"
               
-              # HTMLはMarkdownをGitHubスタイルで変換
-              echo "  Generating HTML (GitHub style)..."
+              # Markdownファイルをコピー（GitHub Pagesで自動変換）
+              echo "  Copying Markdown..."
               cp "$DATE_DIR/slide.md" "output/slides/$DATE_DIR.md"
-            fi
+              
+              # 画像パスを調整（相対パスから適切なパスへ）
+              sed -i "s|!\[\([^]]*\)\](\(assets/[^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
+              sed -i "s|!\[\([^]]*\)\](\([^/)][^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
             fi
             
             # ハンズオン資料をコピー
@@ -162,7 +159,7 @@ jobs:
           
           # 各セミナーのリンクを生成
           for DATE_DIR in $(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort -r); do
-            if [ -f "output/slides/$DATE_DIR.html" ] || [ -f "output/slides/$DATE_DIR.pdf" ] || [ -d "output/handson/$DATE_DIR" ]; then
+            if [ -f "output/slides/$DATE_DIR.md" ] || [ -f "output/slides/$DATE_DIR.pdf" ] || [ -d "output/handson/$DATE_DIR" ]; then
               echo "<div class=\"seminar\">" >> output/index.html
               echo "  <h2>📅 $DATE_DIR</h2>" >> output/index.html
               echo "  <div class=\"links\">" >> output/index.html
@@ -185,4 +182,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./output
           force_orphan: true
-          enable_jekyll: truef
+          enable_jekyll: true
