@@ -30,8 +30,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
           npm install -g @marp-team/marp-cli
-          # Markdown to HTML converter
-          npm install -g markdown-it markdown-it-emoji markdown-it-highlightjs markdown-it-anchor
 
       - name: Build all materials
         run: |
@@ -187,4 +185,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./output
           force_orphan: true
-          enable_jekyll: true
+          enable_jekyll: truef
