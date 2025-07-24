@@ -2,7 +2,12 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="調査ツール">
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==">
+    <link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoi44Kq44OV44Op44Kk44Oz6Kq/5p+744OE44O844OrIiwic2hvcnRfbmFtZSI6Iuiqv+afu+ODhOODvOODqyIsInN0YXJ0X3VybCI6Ii4vIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI2ZmZmZmZiIsInRoZW1lX2NvbG9yIjoiIzE5NzZkMiIsIm9yaWVudGF0aW9uIjoiYW55In0=">
     <title>オフライン現地調査ツール</title>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <style>
@@ -32,6 +37,30 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             max-width: 300px;
+        }
+        
+        /* iOS Safari standalone mode adjustments */
+        .standalone .controls {
+            top: 30px; /* ステータスバー分の余白 */
+        }
+        
+        .install-prompt {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            display: none;
+        }
+        
+        .install-prompt.visible {
+            display: block;
+        }
+        
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .standalone .controls {
+                top: calc(10px + env(safe-area-inset-top));
+            }
         }
         
         .status {
@@ -245,6 +274,11 @@
     </div>
     
     <div class="controls">
+        <div class="install-prompt" id="ios-install-prompt">
+            <strong>📱 オフライン利用のために：</strong><br>
+            共有ボタン → ホーム画面に追加
+        </div>
+        
         <div class="status" id="status">
             <span class="status-dot"></span>
             <span id="status-text">接続確認中...</span>
@@ -1125,6 +1159,12 @@
             try {
                 await initDB();
                 
+                // Service Workerの準備を待つ
+                if ('serviceWorker' in navigator) {
+                    await navigator.serviceWorker.ready;
+                    console.log('Service Worker準備完了');
+                }
+                
                 // オンライン状態を確認（実際のネットワークテスト）
                 await updateOnlineStatus();
                 await tileCache.updateCacheInfo();
@@ -1140,6 +1180,11 @@
                         
                         // 境界ボックスを表示
                         map.fitBounds(YAMAGUCHI_UBE_BOUNDS, { padding: 50 });
+                        
+                        // iOS Safari用の案内表示
+                        if (window.navigator.standalone === false && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                            document.getElementById('ios-install-prompt').classList.add('visible');
+                        }
                     });
                     
                     // オフライン時の追加処理
