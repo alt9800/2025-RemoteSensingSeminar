@@ -131,7 +131,7 @@ EOF
       - name: Generate index page
         run: |
           # Jekyll設定ファイルを作成
-          cat > output/_config.yml << 'EOF'
+          cat > output/_config.yml << 'CONFIG_EOF'
           # Jekyll設定
           markdown: kramdown
           highlighter: rouge
@@ -147,7 +147,7 @@ EOF
           # slidesディレクトリ内のMarkdownファイルも処理
           include:
             - slides/*.md
-          EOF
+          CONFIG_EOF
           
           cat > output/index.html << 'EOF'
           <!DOCTYPE html>
