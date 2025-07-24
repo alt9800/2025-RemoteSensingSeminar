@@ -176,8 +176,6 @@ npm install sqlite3
 npm install --save-dev nodemon
 ```
 
----
-
 
 ---
 
@@ -314,6 +312,17 @@ module.exports = {
 DBの初期化
 ```sh
 node scripts/init-db.js
+```
+
+
+---
+
+```sh
+$ node scripts/init-db.js
+[dotenv@17.2.0] injecting env (4) from .env (tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] })
+Initializing database...
+Database initialization completed!
+Database connection closed.
 ```
 
 ---
@@ -618,6 +627,62 @@ npm run dev
 
 ---
 
+☝️ [http://localhost:3000](http://localhost:3000) にアクセスしてみましょう！
+
+
+---
+
+## 💡Curlリクエストをかける都合上、もう一つCLI(コマンドプロンプトやPowerShell)をもう一つ立ち上げます。
+
+
+Curlの基本形は
+```
+curl -X  [GET|POST|PUT|DELETE]  [URL]  [-H "Content-Type: application/json"]  [-d '{"key": "value"}']
+```
+です
+
+---
+curlの-Hオプションで指定できる主なContent-Typeは以下のようなものがあります
+
+### アプリケーション関連
+```
+application/json: JSONデータ
+application/xml: XMLデータ
+application/x-www-form-urlencoded: フォームデータ
+application/octet-stream: バイナリデータ
+application/pdf: PDFファイル
+application/zip: ZIPファイル
+```
+
+### テキスト関連
+```
+<div class="tiny-text">
+text/plain: プレーンテキスト
+text/html: HTMLデータ
+text/csv: CSVファイル
+text/javascript: JavaScriptファイル
+```
+---
+
+### マルチパート関連
+```
+multipart/form-data: ファイルアップロード時によく使用
+multipart/mixed: 複数のコンテンツタイプを含む
+```
+
+### メディア関連
+```
+<div class="tiny-text">
+image/jpeg: JPEGイメージ
+image/png: PNGイメージ
+image/gif: GIFイメージ
+audio/mpeg: MP3音声
+video/mp4: MP4動画
+</div>
+```
+
+---
+
 ```sh
 curl -X POST http://localhost:3000/api/auth/signup \
   -H "Content-Type: application/json" \
@@ -647,6 +712,7 @@ curl -X POST http://localhost:3000/api/auth/signup \
 ```
 
 ---
+
 ログイン
 ```sh
 curl -X POST http://localhost:3000/api/auth/login \
@@ -661,7 +727,65 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 ---
 
+
+トークンの生成プロセス
+
+```js
+const jwt = require('jsonwebtoken');
+
+// 1. シークレットキー（サーバーだけが知っている）
+const JWT_SECRET = 'your-super-secret-key-12345';
+
+// 2. トークンに含めるデータ
+const userData = {
+  id: 1,
+  user_id: 'testuser',
+  email: 'test@example.com'
+};
+
+// 3. トークンの生成
+const token = jwt.sign(
+  userData,           // ペイロードデータ
+  JWT_SECRET,         // シークレットキー
+  { expiresIn: '7d' } // オプション（7日間有効）
+);
+
+console.log(token);
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+---
+
+同じユーザーでも、ログインするたびに異なるトークンが生成されます。
+
+```json
+{
+  "id": 1,
+  "user_id": "testuser",
+  "iat": 1705123456,  // ← これが毎回変わる（現在時刻）
+  "exp": 1705728256   // ← これも毎回変わる（期限）
+}
+```
+
+---
+
+## 重要な概念として、ステートレス(状態を持たない)というものがあります。
+
+* サーバーにセッション情報を保存しない
+* トークン自体に必要な情報が含まれている
+
+
+---
+
+ちなみに、トークンは平文で送信されるため、必ずHTTPS通信を使用する必要があります。(httpだと改竄可能性があります)
+
+
+---
+
 ## よりAPIとして使いやすくする
+
+`http://localhost:3000/api/users/me`の情報をhtmlで読み込むようにすると、(ログインしているユーザごとに)動的にユーザ情報をページとして表示できるようになります。
+
 
 ---
 
@@ -722,7 +846,7 @@ app.use('/api/users', usersRoutes);  // 追加
 ---
 テスト
 ```
-# ログインしてトークンを取得
+# ログインしてトークンを取得 (この部分エラーが吐かれないので改善の余地があるかも)
 TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"user_id": "testuser", "password": "password123"}' \
@@ -846,6 +970,7 @@ curl -X GET http://localhost:3000/api/users/me \
 </html>
 ```
 
+
 ---
 
 ## 講義中に触れたAPI Callを便利にするツールはこの辺り
@@ -871,7 +996,147 @@ curl -X GET http://localhost:3000/api/users/me \
 JWTとは (この講義では基本的にはこれを利用してアプリを組んでいく)
 
 
+---
 
+
+```
+==============================================================================
+1. 初回アクセス（未認証状態）
+==============================================================================
+
+ブラウザ (Client)                                    サーバー (Express.js)
+     |                                                        |
+     |  1. GET /mypage/ ---------------------------------->  |
+     |     (認証なし、普通のHTTPリクエスト)                    |
+     |                                                        |
+     |                                         mypage.htmlをチェック
+     |                                         → 認証が必要なページ
+     |                                                        |
+     |  <--- 2. 200 OK (mypage.html) ---------------------  |
+     |       ただしJavaScriptで認証チェック                    |
+     |                                                        |
+     |                                                        |
+[ブラウザでJavaScript実行]                                      |
+if (!localStorage.getItem('auth_token')) {                    |
+  window.location.href = '/login/';                          |
+}                                                             |
+     |                                                        |
+     |  3. GET /login/ ----------------------------------->  |
+     |     (リダイレクト)                                      |
+     |                                                        |
+     |  <--- 4. 200 OK (login.html) ----------------------  |
+     |                                                        |
+     |                                                        |
+
+```
+
+
+---
+
+
+```
+==============================================================================
+2. ログイン処理
+==============================================================================
+
+ブラウザ (Client)                                    サーバー (Express.js)
+     |                                                        |
+[ユーザーがフォームに入力]                                       |
+- user_id: testuser                                           |
+- password: password123                                       |
+     |                                                        |
+     |  5. POST /api/auth/login ------------------------->  |
+     |     Content-Type: application/json                     |
+     |     Body: {                                           |
+     |       "user_id": "testuser",                          |
+     |       "password": "password123"                       |
+     |     }                                                 |
+     |                                                        |
+     |                                         [サーバー処理]
+     |                                         1. リクエストボディを解析
+     |                                         2. データベースでユーザー検索
+     |                                            SELECT * FROM users 
+     |                                            WHERE user_id = 'testuser'
+     |                                         3. パスワード検証
+     |                                            bcrypt.compare(password, hash)
+     |                                         4. JWT生成
+     |                                            jwt.sign({
+     |                                              id: 1,
+     |                                              user_id: 'testuser',
+     |                                              email: 'test@example.com'
+     |                                            }, SECRET, {expiresIn: '7d'})
+     |                                                        |
+     |  <--- 6. 200 OK (JSON) -----------------------------  |
+     |       {                                               |
+     |         "message": "ログインに成功しました",              |
+     |         "token": "eyJhbGciOiJIUzI1NiIs...",          |
+     |         "user": {                                     |
+     |           "id": 1,                                    |
+     |           "user_id": "testuser",                      |
+     |           "email": "test@example.com"                 |
+     |         }                                             |
+     |       }                                               |
+     |                                                        |
+[ブラウザでトークン保存]                                         |
+localStorage.setItem('auth_token', response.token);           |
+localStorage.setItem('user_info', JSON.stringify(response.user));|
+     |                                                        |
+     |  7. GET / -------------------------------------->   |
+     |     (リダイレクト to メインページ)                       |
+     |                                                        |
+     |  <--- 8. 200 OK (index.html) ---------------------   |
+     |                                                        |
+```
+
+---
+
+```
+==============================================================================
+3. 認証が必要なAPIへのアクセス
+==============================================================================
+
+ブラウザ (Client)                                    サーバー (Express.js)
+     |                                                        |
+[JavaScriptでAPI呼び出し]                                      |
+const token = localStorage.getItem('auth_token');             |
+     |                                                        |
+     |  9. GET /api/users/me ----------------------------> |
+     |     Authorization: Bearer eyJhbGciOiJIUzI1NiIs...     |
+     |                                                        |
+     |                                         [認証ミドルウェア処理]
+     |                                         authenticateToken()
+     |                                         1. ヘッダーからトークン取得
+     |                                            Bearer eyJhbGci...
+     |                                         2. トークンを検証
+     |                                            jwt.verify(token, SECRET)
+     |                                         3. 検証成功
+     |                                            req.user = {
+     |                                              id: 1,
+     |                                              user_id: 'testuser',
+     |                                              email: 'test@example.com',
+     |                                              iat: 1705123456,
+     |                                              exp: 1705728256
+     |                                            }
+     |                                         4. next() で次の処理へ
+     |                                                        |
+     |                                         [ルートハンドラ処理]
+     |                                         router.get('/me', ...)
+     |                                         req.user が使える！
+     |                                                        |
+     |  <--- 10. 200 OK (JSON) --------------------------- |
+     |        {                                              |
+     |          "user": {                                    |
+     |            "id": 1,                                   |
+     |            "user_id": "testuser",                     |
+     |            "email": "test@example.com",               |
+     |            "created_at": "2024-01-15T10:30:00.000Z"  |
+     |          }                                            |
+     |        }                                              |
+     |                                                        |
+[JavaScriptでDOM更新]                                          |
+document.getElementById('username').textContent = user.user_id; |
+     |                                                        |
+```
 
 ---
 ## OAuth認証とは？
@@ -1065,3 +1330,13 @@ MacのSafariの例ではあるが、試験的な機能の有効化が必要な�
 FileAPIが行けるのでは...?
 
 ---
+
+紹介した書籍
+
+[Docker&仮想サーバー完全入門　Webクリエイター＆エンジニアの作業がはかどる開発環境構築ガイド - インプレスブックス](https://book.impress.co.jp/books/1121101138)
+
+[作りながら学ぶ Webシステムの教科書 | 日経BOOKプラス](https://bookplus.nikkei.com/atcl/catalog/23/08/30/00965/)
+
+[JavaScript コードレシピ集 | 技術評論社](https://gihyo.jp/book/2019/978-4-297-10368-2)
+
+
