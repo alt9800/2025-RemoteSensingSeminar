@@ -61,13 +61,75 @@ jobs:
               cd "$DATE_DIR" && marp slide.md -o slide.pdf --pdf --allow-local-files && cd ..
               mv "$DATE_DIR/slide.pdf" "output/slides/$DATE_DIR.pdf"
               
-              # Markdownファイルをコピー（GitHub Pagesで自動変換）
-              echo "  Copying Markdown..."
-              cp "$DATE_DIR/slide.md" "output/slides/$DATE_DIR.md"
+              # Markdownビュー用のHTMLファイルを生成
+              echo "  Creating Markdown view..."
+              cat > "output/slides/$DATE_DIR.html" << VIEW_EOF
+---
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>$DATE_DIR - セミナー資料</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <style>
+        body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+            background-color: #ffffff;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+        .markdown-body pre {
+            background-color: #f6f8fa;
+        }
+        hr {
+            height: 2px;
+            border: none;
+            background-color: #d0d7de;
+            margin: 3em 0;
+        }
+        @media (max-width: 767px) {
+            body { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <article class="markdown-body">
+VIEW_EOF
               
-              # 画像パスを調整（相対パスから適切なパスへ）
-              sed -i "s|!\[\([^]]*\)\](\(assets/[^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
-              sed -i "s|!\[\([^]]*\)\](\([^/)][^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
+              # Markdownの内容を処理してHTMLに埋め込む
+              cat "$DATE_DIR/slide.md" | sed 's/---/\n<hr>\n/g' >> "output/slides/$DATE_DIR.html"
+              
+              cat >> "output/slides/$DATE_DIR.html" << VIEW_EOF2
+    </article>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+</body>
+</html>
+VIEW_EOF2
+              
+              # 画像パスを調整（HTMLファイル内で）
+              sed -i "s|!\[\([^]]*\)\](assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" "output/slides/$DATE_DIR.html"
+              sed -i "s|!\[\([^]]*\)\](./assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" "output/slides/$DATE_DIR.html"
+              sed -i "s|!\[\([^]]*\)\](\([^/:)][^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.html"
+              
+              # HTMLタグの画像パスも調整
+              sed -i "s|<img\([^>]*\)src=\"assets/|<img\1src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.html"
+              sed -i "s|<img\([^>]*\)src=\"./assets/|<img\1src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.html"
+              
+              # 重複を防ぐ
+              sed -i "s|$DATE_DIR/$DATE_DIR|$DATE_DIR|g" "output/slides/$DATE_DIR.html"
             fi
             
             # ハンズオン資料をコピー
@@ -77,9 +139,21 @@ jobs:
             fi
           done
 
+      - name: Create Jekyll config
+        run: |
+          cat > output/_config.yml << 'YAML_EOF'
+          # Jekyll設定
+          markdown: kramdown
+          highlighter: rouge
+          
+          # slidesディレクトリ内のMarkdownファイルも処理
+          include:
+            - slides
+          YAML_EOF
+
       - name: Generate index page
         run: |
-          cat > output/index.html << 'EOF'
+          cat > output/index.html << 'HTML_EOF'
           <!DOCTYPE html>
           <html lang="ja">
           <head>
@@ -155,7 +229,7 @@ jobs:
           <body>
               <div class="container">
                   <h1>📚 セミナー資料</h1>
-          EOF
+          HTML_EOF
           
           # 各セミナーのリンクを生成
           for DATE_DIR in $(find . -maxdepth 1 -type d -name '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sed 's|./||' | sort -r); do
@@ -164,7 +238,7 @@ jobs:
               echo "  <h2>📅 $DATE_DIR</h2>" >> output/index.html
               echo "  <div class=\"links\">" >> output/index.html
               
-              [ -f "output/slides/$DATE_DIR.md" ] && echo "    <a href=\"slides/$DATE_DIR.md\">📝 スライド (Markdown)</a>" >> output/index.html
+              [ -f "output/slides/$DATE_DIR.html" ] && echo "    <a href=\"slides/$DATE_DIR.html\">📝 スライド (Markdown)</a>" >> output/index.html
               [ -f "output/slides/$DATE_DIR.pdf" ] && echo "    <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> output/index.html
               [ -d "output/handson/$DATE_DIR" ] && echo "    <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> output/index.html
               
