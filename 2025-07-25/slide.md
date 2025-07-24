@@ -570,8 +570,9 @@ module.exports = router;
 ---
 
 認証ミドルウェアの更新
+
 src/middleware/auth.jsにoptionalAuthを追加：
-(お尻につけるだけでOK)
+
 
 ---
 
@@ -736,6 +737,7 @@ npm run dev
 投稿一覧の取得（認証不要）: GETなのでブラウザでも...
 ```sh
 curl http://localhost:3000/api/posts
+#> {"posts":[],"total":0}
 ```
 
 ---
@@ -748,6 +750,8 @@ TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
   -d '{"user_id": "testuser", "password": "password123"}' \
   | grep -o '"token":"[^"]*' | grep -o '[^"]*$')
 ```
+
+(Q.JWTはブラウザだとどこに持たれるか？ A. localstorage)
 
 ```sh
 # 投稿作成（画像なし）
@@ -821,6 +825,1442 @@ curl http://localhost:3000/api/posts/user/testuser
 ```
 
 ---
+
+ここまでやったこと
+
+1. データベーススキーマの拡張
+
+postsテーブルの追加
+必要なインデックスの設定
+外部キー制約の設定
+
+2. 投稿関連API（6つ）
+
+GET /api/posts - 投稿一覧（認証不要）
+GET /api/posts/:id - 特定投稿の取得
+POST /api/posts - 新規投稿（認証必要）
+PUT /api/posts/:id - 投稿更新（認証必要）
+DELETE /api/posts/:id - 投稿削除（認証必要）
+GET /api/posts/user/:userId - ユーザー別一覧
+
+3. 画像アップロード機能
+
+multerによるファイルアップロード
+10MBのサイズ制限
+jpg, jpeg, png, gif形式のみ許可
+ユニークなファイル名生成
+
+---
+
+# フロントエンド(View)の作成
+
+---
+
+## まずは地図機能以外の部分のViewを。
+
+
+### 1. HTMLページ（4つ）
+
+index.html - メインページ（地図と投稿一覧）
+login/index.html - ログインページ
+signup/index.html - サインアップページ
+mypage/index.html - マイページ
+
+### 2. JavaScript機能
+
+common.js - 共通関数（認証トークン管理、日付フォーマット等）
+auth.js - 認証関連（ログイン、サインアップ、トークン検証）
+map.js - 地図機能の暫定版（投稿一覧の表示のみ）
+mypage.js - マイページ機能
+
+
+---
+
+`public/index.html` : （メインページ）
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フィールド調査システム</title>
+    
+    <!-- MapLibre GL JS -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    
+    <!-- 共通スタイル -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-container">
+            <h1 class="header-title">
+                <a href="/">フィールド調査システム</a>
+            </h1>
+            <nav class="header-nav">
+                <div id="nav-not-logged-in" class="nav-group" style="display: none;">
+                    <a href="/login/" class="btn btn-outline">ログイン</a>
+                    <a href="/signup/" class="btn btn-primary">サインアップ</a>
+                </div>
+                <div id="nav-logged-in" class="nav-group" style="display: none;">
+                    <span class="username" id="current-username"></span>
+                    <a href="/mypage/" class="btn btn-outline">マイページ</a>
+                    <button id="logout-btn" class="btn btn-danger">ログアウト</button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="main-container">
+        <!-- 地図エリア -->
+        <div id="map" class="map-container"></div>
+        
+        <!-- サイドパネル -->
+        <aside class="side-panel">
+            <h2>投稿一覧</h2>
+            <div id="posts-list" class="posts-list">
+                <p class="loading">読み込み中...</p>
+            </div>
+        </aside>
+    </main>
+
+    <!-- 投稿モーダル -->
+    <div id="post-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>新規投稿</h2>
+            <form id="post-form">
+                <div class="form-group">
+                    <label>位置情報</label>
+                    <p>緯度: <span id="modal-lat"></span></p>
+                    <p>経度: <span id="modal-lng"></span></p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="post-comment">コメント</label>
+                    <textarea id="post-comment" rows="4" maxlength="1000" placeholder="場所の説明や観察内容を入力してください"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="post-image">画像</label>
+                    <input type="file" id="post-image" accept="image/jpeg,image/jpg,image/png,image/gif">
+                    <div id="image-preview" class="image-preview"></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" id="cancel-post">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">投稿する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 共通スクリプト -->
+    <script src="/js/common.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/map.js"></script>
+</body>
+</html>
+```
+
+
+---
+
+`public/login/index.html``` : （ログインページ）
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - フィールド調査システム</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f5f5;
+        }
+        
+        .auth-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .auth-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .auth-link {
+            text-align: center;
+            margin-top: 1rem;
+            color: #6b7280;
+        }
+        
+        .auth-link a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        
+        .auth-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-container">
+            <h1 class="header-title">
+                <a href="/">フィールド調査システム</a>
+            </h1>
+            <nav class="header-nav">
+                <div id="nav-not-logged-in" class="nav-group">
+                    <a href="/login/" class="btn btn-outline">ログイン</a>
+                    <a href="/signup/" class="btn btn-primary">サインアップ</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ログインフォーム -->
+    <div class="auth-container">
+        <div class="auth-box">
+            <h2 class="auth-title">ログイン</h2>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="user-id">ユーザーID</label>
+                    <input type="text" id="user-id" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">ログイン</button>
+                </div>
+            </form>
+            
+            <div class="auth-link">
+                アカウントをお持ちでない方は <a href="/signup/">サインアップ</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userId = document.getElementById('user-id').value;
+            const password = document.getElementById('password').value;
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            
+            // ボタンを無効化
+            submitButton.disabled = true;
+            submitButton.textContent = 'ログイン中...';
+            
+            const result = await login(userId, password);
+            
+            if (result.success) {
+                window.location.href = '/';
+            } else {
+                showError(result.error, e.target);
+                submitButton.disabled = false;
+                submitButton.textContent = 'ログイン';
+            }
+        });
+    </script>
+</body>
+</html>
+```
+
+
+---
+
+`public/signup/index.html`:（サインアップページ）
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サインアップ - フィールド調査システム</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f5f5;
+        }
+        
+        .auth-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .auth-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .auth-link {
+            text-align: center;
+            margin-top: 1rem;
+            color: #6b7280;
+        }
+        
+        .auth-link a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        
+        .auth-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .help-text {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-container">
+            <h1 class="header-title">
+                <a href="/">フィールド調査システム</a>
+            </h1>
+            <nav class="header-nav">
+                <div id="nav-not-logged-in" class="nav-group">
+                    <a href="/login/" class="btn btn-outline">ログイン</a>
+                    <a href="/signup/" class="btn btn-primary">サインアップ</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- サインアップフォーム -->
+    <div class="auth-container">
+        <div class="auth-box">
+            <h2 class="auth-title">サインアップ</h2>
+            
+            <form id="signup-form">
+                <div class="form-group">
+                    <label for="email">メールアドレス</label>
+                    <input type="email" id="email" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-id">ユーザーID</label>
+                    <input type="text" id="user-id" required pattern="[a-zA-Z0-9_-]{3,}" title="3文字以上の英数字、ハイフン、アンダースコアのみ">
+                    <p class="help-text">3文字以上の英数字、ハイフン(-)、アンダースコア(_)が使用できます</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" required minlength="6">
+                    <p class="help-text">6文字以上で設定してください</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password-confirm">パスワード（確認）</label>
+                    <input type="password" id="password-confirm" required minlength="6">
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">アカウント作成</button>
+                </div>
+            </form>
+            
+            <div class="auth-link">
+                既にアカウントをお持ちの方は <a href="/login/">ログイン</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const userId = document.getElementById('user-id').value;
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('password-confirm').value;
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            
+            // パスワード確認
+            if (password !== passwordConfirm) {
+                showError('パスワードが一致しません', e.target);
+                return;
+            }
+            
+            // ボタンを無効化
+            submitButton.disabled = true;
+            submitButton.textContent = '作成中...';
+            
+            const result = await signup(email, userId, password);
+            
+            if (result.success) {
+                showSuccess('アカウントが作成されました！');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            } else {
+                showError(result.error, e.target);
+                submitButton.disabled = false;
+                submitButton.textContent = 'アカウント作成';
+            }
+        });
+    </script>
+</body>
+</html>
+
+```
+
+
+
+---
+
+`public/mypage/index.html`:（マイページ）
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マイページ - フィールド調査システム</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .mypage-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .user-info {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .user-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .stat-card {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .my-posts {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .posts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .post-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        
+        .post-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .post-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #f3f4f6;
+        }
+        
+        .post-content {
+            padding: 1rem;
+        }
+        
+        .post-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .btn-small {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-container">
+            <h1 class="header-title">
+                <a href="/">フィールド調査システム</a>
+            </h1>
+            <nav class="header-nav">
+                <div id="nav-not-logged-in" class="nav-group" style="display: none;">
+                    <a href="/login/" class="btn btn-outline">ログイン</a>
+                    <a href="/signup/" class="btn btn-primary">サインアップ</a>
+                </div>
+                <div id="nav-logged-in" class="nav-group" style="display: none;">
+                    <span class="username" id="current-username"></span>
+                    <a href="/mypage/" class="btn btn-outline">マイページ</a>
+                    <button id="logout-btn" class="btn btn-danger">ログアウト</button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- マイページコンテンツ -->
+    <div class="mypage-container">
+        <!-- ユーザー情報 -->
+        <div class="user-info">
+            <h2>ユーザー情報</h2>
+            <div id="user-details">
+                <p class="loading">読み込み中...</p>
+            </div>
+        </div>
+
+        <!-- 自分の投稿 -->
+        <div class="my-posts">
+            <h2>投稿一覧</h2>
+            <div id="my-posts-grid" class="posts-grid">
+                <p class="loading">読み込み中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/mypage.js"></script>
+</body>
+</html>
+```
+
+
+---
+
+
+JS部分を作っていきます。
+サンプルで提示したものと異なって、
+共通かできる部品が多くあるので、これを繰り返し使えるように切り出していきます。
+また、それに伴って、特定のページでしか使わないコードも単一のJSファイルとして切り出します。
+
+---
+
+```sh
+mkdir -p public/{login,signup,mypage,js,css}
+```
+
+---
+
+`public/js/common.js`
+
+```js
+// 共通関数とユーティリティ
+
+// API のベースURL
+const API_BASE_URL = '/api';
+
+// ローカルストレージのキー
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'user_info';
+
+// 認証トークンの取得
+function getAuthToken() {
+    return localStorage.getItem(TOKEN_KEY);
+}
+
+// 認証トークンの保存
+function setAuthToken(token) {
+    localStorage.setItem(TOKEN_KEY, token);
+}
+
+// 認証トークンの削除
+function removeAuthToken() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+}
+
+// ユーザー情報の取得
+function getUserInfo() {
+    const userStr = localStorage.getItem(USER_KEY);
+    return userStr ? JSON.parse(userStr) : null;
+}
+
+// ユーザー情報の保存
+function setUserInfo(user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+// APIリクエストのヘッダー生成
+function getAuthHeaders() {
+    const token = getAuthToken();
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+}
+
+// 日付フォーマット
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    
+    // 1分以内
+    if (diff < 60000) {
+        return 'たった今';
+    }
+    // 1時間以内
+    if (diff < 3600000) {
+        const minutes = Math.floor(diff / 60000);
+        return `${minutes}分前`;
+    }
+    // 24時間以内
+    if (diff < 86400000) {
+        const hours = Math.floor(diff / 3600000);
+        return `${hours}時間前`;
+    }
+    // 7日以内
+    if (diff < 604800000) {
+        const days = Math.floor(diff / 86400000);
+        return `${days}日前`;
+    }
+    
+    // それ以外は日付表示
+    return date.toLocaleDateString('ja-JP');
+}
+
+// エラーメッセージの表示
+function showError(message, targetElement) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error';
+    errorDiv.textContent = message;
+    
+    if (targetElement) {
+        // 既存のエラーメッセージを削除
+        const existingError = targetElement.querySelector('.error');
+        if (existingError) {
+            existingError.remove();
+        }
+        targetElement.appendChild(errorDiv);
+        
+        // 5秒後に自動削除
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
+    } else {
+        alert(message);
+    }
+}
+
+// 成功メッセージの表示
+function showSuccess(message, targetElement) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success';
+    successDiv.textContent = message;
+    
+    if (targetElement) {
+        // 既存のメッセージを削除
+        const existingMessage = targetElement.querySelector('.success, .error');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+        targetElement.appendChild(successDiv);
+        
+        // 3秒後に自動削除
+        setTimeout(() => {
+            successDiv.remove();
+        }, 3000);
+    } else {
+        alert(message);
+    }
+}
+
+// ヘッダーナビゲーションの更新
+function updateNavigation() {
+    const notLoggedIn = document.getElementById('nav-not-logged-in');
+    const loggedIn = document.getElementById('nav-logged-in');
+    const usernameSpan = document.getElementById('current-username');
+    
+    // 要素が存在しない場合は早期リターン
+    if (!notLoggedIn || !loggedIn) {
+        console.warn('Navigation elements not found');
+        return;
+    }
+    
+    const user = getUserInfo();
+    
+    if (user) {
+        // ログイン済み
+        notLoggedIn.style.display = 'none';
+        loggedIn.style.display = 'flex';
+        if (usernameSpan) {
+            usernameSpan.textContent = user.user_id;
+        }
+    } else {
+        // 未ログイン
+        notLoggedIn.style.display = 'flex';
+        loggedIn.style.display = 'none';
+    }
+}
+
+// HTMLエスケープ
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ページ読み込み時の初期化
+document.addEventListener('DOMContentLoaded', () => {
+    updateNavigation();
+    
+    // ログアウトボタンのイベント
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            if (confirm('ログアウトしますか？')) {
+                removeAuthToken();
+                window.location.href = '/';
+            }
+        });
+    }
+});
+```
+
+---
+
+`public/js/auth.js`
+
+```js
+
+// 認証関連の関数
+
+// ログインチェックと認証が必要なページでのリダイレクト
+function requireAuth() {
+    const token = getAuthToken();
+    if (!token) {
+        window.location.href = '/login/';
+        return false;
+    }
+    return true;
+}
+
+// トークンの検証
+async function verifyToken() {
+    const token = getAuthToken();
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.valid;
+        }
+        
+        // トークンが無効な場合はクリア
+        removeAuthToken();
+        return false;
+    } catch (error) {
+        console.error('Token verification error:', error);
+        return false;
+    }
+}
+
+// ログイン処理
+async function login(userId, password) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                password: password
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            setAuthToken(data.token);
+            setUserInfo(data.user);
+            return { success: true };
+        } else {
+            return { success: false, error: data.message || 'ログインに失敗しました' };
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        return { success: false, error: 'ネットワークエラーが発生しました' };
+    }
+}
+
+// サインアップ処理
+async function signup(email, userId, password) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: email,
+                user_id: userId,
+                password: password
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            setAuthToken(data.token);
+            setUserInfo(data.user);
+            return { success: true };
+        } else {
+            // バリデーションエラーの処理
+            if (data.errors) {
+                const errorMessages = data.errors.map(err => err.msg).join('\n');
+                return { success: false, error: errorMessages };
+            }
+            return { success: false, error: data.message || 'サインアップに失敗しました' };
+        }
+    } catch (error) {
+        console.error('Signup error:', error);
+        return { success: false, error: 'ネットワークエラーが発生しました' };
+    }
+}
+
+// ユーザー情報の取得
+async function fetchUserInfo() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/me`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            setUserInfo(data.user);
+            return data.user;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Fetch user info error:', error);
+        return null;
+    }
+}
+```
+
+---
+
+CSSについても同様に切り出しておき、共通カタログ(コレクション)として作っておいて、書くhtmlから必要な部分だけ利用するようにします。
+
+```css
+/* リセットとベース設定 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+}
+
+/* ヘッダー */
+.header {
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.header-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.header-title a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.nav-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.username {
+    font-weight: 500;
+    color: #666;
+}
+
+/* ボタン */
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background-color: #2563eb;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
+}
+
+.btn-outline {
+    background-color: white;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+
+.btn-outline:hover {
+    background-color: #eff6ff;
+}
+
+.btn-danger {
+    background-color: #dc2626;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #b91c1c;
+}
+
+/* メインコンテナ */
+.main-container {
+    display: flex;
+    height: calc(100vh - 80px);
+    position: relative;
+}
+
+/* 地図 */
+.map-container {
+    flex: 1;
+    position: relative;
+}
+
+/* サイドパネル */
+.side-panel {
+    width: 400px;
+    background-color: white;
+    box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.side-panel h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+/* 投稿リスト */
+.posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.post-item {
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.post-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.post-item.selected {
+    border-color: #2563eb;
+    background-color: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.post-user {
+    font-weight: 500;
+    color: #2563eb;
+}
+
+.post-date {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.post-comment {
+    margin-bottom: 0.5rem;
+    word-wrap: break-word;
+}
+
+.post-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 0.375rem;
+}
+
+.loading {
+    text-align: center;
+    color: #6b7280;
+}
+
+/* モーダル */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.modal-close:hover {
+    color: #374151;
+}
+
+/* フォーム */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.image-preview {
+    margin-top: 1rem;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 0.375rem;
+}
+
+/* エラーメッセージ */
+.error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.success {
+    color: #059669;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* レスポンシブ */
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column;
+    }
+    
+    .side-panel {
+        width: 100%;
+        height: 300px;
+        box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .header-container {
+        padding: 1rem;
+    }
+    
+    .modal-content {
+        padding: 1.5rem;
+    }
+}
+```
+
+
+---
+
+`public/js/map.js`
+```js
+// 地図関連の機能（Phase 3で完全実装）
+
+let map;
+let posts = [];
+
+// 地図の初期化（暫定）
+function initMap() {
+    // Phase 3で実装
+    console.log('Map will be initialized in Phase 3');
+    
+    // とりあえず投稿一覧だけ読み込む
+    loadPosts();
+}
+
+// 投稿の読み込み
+async function loadPosts() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/posts`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            posts = data.posts;
+            displayPosts(data.posts);
+        }
+    } catch (error) {
+        console.error('Load posts error:', error);
+        showError('投稿の読み込みに失敗しました');
+    }
+}
+
+// 投稿一覧の表示
+function displayPosts(posts) {
+    const postsList = document.getElementById('posts-list');
+    
+    if (!postsList) return;
+    
+    if (posts.length === 0) {
+        postsList.innerHTML = '<p class="loading">投稿がありません</p>';
+        return;
+    }
+    
+    postsList.innerHTML = posts.map(post => `
+        <div class="post-item" data-post-id="${post.id}">
+            <div class="post-header">
+                <span class="post-user">${escapeHtml(post.username)}</span>
+                <span class="post-date">${formatDate(post.created_at)}</span>
+            </div>
+            ${post.comment ? `<p class="post-comment">${escapeHtml(post.comment)}</p>` : ''}
+            ${post.image_url ? `<img src="${post.image_url}" alt="投稿画像" class="post-image">` : ''}
+        </div>
+    `).join('');
+}
+
+// ページ読み込み時
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('map')) {
+        initMap();
+    }
+});
+```
+
+
+---
+
+`public/js/mypage.js`
+
+```js
+// マイページ機能
+
+// 認証チェック
+if (!requireAuth()) {
+    // requireAuth内でリダイレクトされる
+}
+
+// ユーザー情報の読み込み
+async function loadUserInfo() {
+    try {
+        const [userResponse, statsResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/users/me`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/users/me/stats`, { headers: getAuthHeaders() })
+        ]);
+
+        if (userResponse.ok && statsResponse.ok) {
+            const userData = await userResponse.json();
+            const statsData = await statsResponse.json();
+            
+            displayUserInfo(userData.user, statsData.stats);
+        }
+    } catch (error) {
+        console.error('Load user info error:', error);
+        showError('ユーザー情報の読み込みに失敗しました');
+    }
+}
+
+// ユーザー情報の表示
+function displayUserInfo(user, stats) {
+    const userDetails = document.getElementById('user-details');
+    userDetails.innerHTML = `
+        <p><strong>ユーザーID:</strong> ${user.user_id}</p>
+        <p><strong>メールアドレス:</strong> ${user.email}</p>
+        <p><strong>登録日:</strong> ${new Date(user.created_at).toLocaleDateString('ja-JP')}</p>
+        
+        <div class="user-stats">
+            <div class="stat-card">
+                <div class="stat-value">${stats.total_posts}</div>
+                <div class="stat-label">総投稿数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.posts_with_images}</div>
+                <div class="stat-label">画像付き投稿</div>
+            </div>
+        </div>
+    `;
+}
+
+// 自分の投稿の読み込み
+async function loadMyPosts() {
+    try {
+        const user = getUserInfo();
+        const response = await fetch(`${API_BASE_URL}/posts/user/${user.user_id}`, {
+            headers: getAuthHeaders()
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayMyPosts(data.posts);
+        }
+    } catch (error) {
+        console.error('Load my posts error:', error);
+        showError('投稿の読み込みに失敗しました');
+    }
+}
+
+// 投稿の表示
+function displayMyPosts(posts) {
+    const postsGrid = document.getElementById('my-posts-grid');
+    
+    if (posts.length === 0) {
+        postsGrid.innerHTML = '<p>まだ投稿がありません</p>';
+        return;
+    }
+
+    postsGrid.innerHTML = posts.map(post => `
+        <div class="post-card" data-post-id="${post.id}">
+            ${post.image_url ? 
+                `<img src="${post.image_url}" alt="投稿画像" class="post-image">` : 
+                '<div class="post-image" style="display: flex; align-items: center; justify-content: center; color: #9ca3af;">画像なし</div>'
+            }
+            <div class="post-content">
+                <p class="post-date">${formatDate(post.created_at)}</p>
+                <p class="post-comment">${escapeHtml(post.comment || '（コメントなし）')}</p>
+                <p style="font-size: 0.875rem; color: #6b7280;">
+                    緯度: ${post.latitude.toFixed(6)}, 経度: ${post.longitude.toFixed(6)}
+                </p>
+                <div class="post-actions">
+                    <button class="btn btn-outline btn-small" onclick="viewOnMap(${post.latitude}, ${post.longitude})">
+                        地図で見る
+                    </button>
+                    <button class="btn btn-danger btn-small" onclick="deletePost(${post.id})">
+                        削除
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 地図で表示（メインページに遷移）
+function viewOnMap(lat, lng) {
+    // 位置情報をセッションストレージに保存
+    sessionStorage.setItem('focusLocation', JSON.stringify({ lat, lng }));
+    window.location.href = '/';
+}
+
+// 投稿の削除
+async function deletePost(postId) {
+    if (!confirm('この投稿を削除しますか？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+
+        if (response.ok) {
+            showSuccess('投稿を削除しました');
+            loadMyPosts(); // 再読み込み
+        } else {
+            const data = await response.json();
+            showError(data.message || '削除に失敗しました');
+        }
+    } catch (error) {
+        console.error('Delete post error:', error);
+        showError('ネットワークエラーが発生しました');
+    }
+}
+
+// ページ読み込み時
+document.addEventListener('DOMContentLoaded', () => {
+    updateNavigation();
+    loadUserInfo();
+    loadMyPosts();
+});
+```
+
+---
+
+
+
+### サーバーを起動
+```sh
+npm run dev
+```
+
+### ブラウザでアクセス
+
+http://localhost:3000/ - メインページ
+http://localhost:3000/login/ - ログインページ
+http://localhost:3000/signup/ - サインアップページ
+http://localhost:3000/mypage/ - マイページ（要ログイン）
+
+
+---
+
 
 
 RESTfulとはなにか？
@@ -929,3 +2369,176 @@ tldraw.io
 
 figma
 canva
+
+
+---
+
+コマンドの変換などをブラウザでする際に、AIアシストを受けると便利かと思います。
+https://duck.ai/
+
+
+
+---
+
+`.gitignore`
+
+```sh
+node_modules/
+.env
+.DS_Store
+*.log
+/db/*.db
+/uploads/*
+!/uploads/.gitkeep
+```
+
+
+---
+
+おすすめの`.gitignore`の設定いろいろ
+
+```sh
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+
+# 環境変数
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ログファイル
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# データベース
+/db/*.db
+/db/*.sqlite
+/db/*.sqlite3
+*.db-journal
+
+# アップロードされたファイル
+/uploads/*
+!/uploads/.gitkeep
+
+# OS生成ファイル
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEとエディタ
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# ビルド出力
+dist/
+build/
+out/
+.cache/
+
+# テスト関連
+coverage/
+.nyc_output/
+*.lcov
+
+# TypeScript
+*.tsbuildinfo
+
+# その他
+.eslintcache
+.stylelintcache
+*.pid
+*.seed
+*.pid.lock
+.grunt
+bower_components
+.lock-wscript
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+*.icloud
+
+# Windows
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# バックアップファイル
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+*.temp
+
+# プロジェクト固有
+/public/uploads/
+/temp/
+/tmp/
+.cache/
+
+# セキュリティ
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# パッケージファイル
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# 開発用メモ（必要に応じて）
+TODO.md
+NOTES.md
+scratch/
+```
