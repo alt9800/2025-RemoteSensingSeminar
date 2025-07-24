@@ -61,8 +61,47 @@ jobs:
               cd "$DATE_DIR" && marp slide.md -o slide.pdf --pdf --allow-local-files && cd ..
               mv "$DATE_DIR/slide.pdf" "output/slides/$DATE_DIR.pdf"
               
-              # Markdownファイルをコピー（GitHub Pagesで自動変換）
-              echo "  Copying Markdown..."
+              # Markdownファイルを.htmlとして保存（GitHub Pagesで自動変換）
+              echo "  Creating Markdown view..."
+              # Jekyll front matterを追加
+              cat > "output/slides/${DATE_DIR}-view.html" << EOF
+---
+---
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>$DATE_DIR - セミナー資料</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+    <style>
+        body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+        @media (max-width: 767px) {
+            body { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <article class="markdown-body">
+{% capture slide_content %}{% include_relative $DATE_DIR.md %}{% endcapture %}
+{{ slide_content | markdownify }}
+    </article>
+</body>
+</html>
+EOF
+              
+              # 元のMarkdownファイルもコピー（インクルード用）
               cp "$DATE_DIR/slide.md" "output/slides/$DATE_DIR.md"
               
               # Markdown記法の画像パスを調整
@@ -91,6 +130,25 @@ jobs:
 
       - name: Generate index page
         run: |
+          # Jekyll設定ファイルを作成
+          cat > output/_config.yml << 'EOF'
+          # Jekyll設定
+          markdown: kramdown
+          highlighter: rouge
+          
+          # Markdownファイルの処理を有効化
+          plugins:
+            - jekyll-relative-links
+          
+          relative_links:
+            enabled: true
+            collections: true
+          
+          # slidesディレクトリ内のMarkdownファイルも処理
+          include:
+            - slides/*.md
+          EOF
+          
           cat > output/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="ja">
@@ -176,7 +234,7 @@ jobs:
               echo "  <h2>📅 $DATE_DIR</h2>" >> output/index.html
               echo "  <div class=\"links\">" >> output/index.html
               
-              [ -f "output/slides/$DATE_DIR.md" ] && echo "    <a href=\"slides/$DATE_DIR.md\">📝 スライド (Markdown)</a>" >> output/index.html
+              [ -f "output/slides/${DATE_DIR}-view.html" ] && echo "    <a href=\"slides/${DATE_DIR}-view.html\">📝 スライド (Markdown形式)</a>" >> output/index.html
               [ -f "output/slides/$DATE_DIR.pdf" ] && echo "    <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> output/index.html
               [ -d "output/handson/$DATE_DIR" ] && echo "    <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> output/index.html
               

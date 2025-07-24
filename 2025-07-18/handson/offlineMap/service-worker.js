@@ -1,5 +1,6 @@
-const CACHE_NAME = 'offline-map-v3';
-const STATIC_CACHE = 'static-v3';
+// service-worker.js
+const CACHE_NAME = 'offline-map-v4';
+const STATIC_CACHE = 'static-v4';
 
 // 静的リソース
 const staticAssets = [
@@ -10,7 +11,9 @@ const staticAssets = [
 ];
 
 self.addEventListener('install', event => {
+    console.log('Service Worker インストール中...');
     self.skipWaiting();
+    
     event.waitUntil(
         caches.open(STATIC_CACHE).then(cache => {
             return cache.addAll(staticAssets);
@@ -19,26 +22,37 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-    event.waitUntil(clients.claim());
+    console.log('Service Worker 有効化');
+    event.waitUntil(
+        clients.claim().then(() => {
+            // 古いキャッシュを削除
+            return caches.keys().then(cacheNames => {
+                return Promise.all(
+                    cacheNames
+                        .filter(name => name !== STATIC_CACHE && name !== CACHE_NAME)
+                        .map(name => caches.delete(name))
+                );
+            });
+        })
+    );
 });
 
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     
-    // OpenStreetMapタイルの処理
+    // タイルのリクエストを処理
     if (url.hostname === 'tile.openstreetmap.org' || url.hostname === 'tile.openstreetmap.jp') {
         event.respondWith(
-            // まずIndexedDBから探す
             (async () => {
+                // まずIndexedDBを確認
                 try {
-                    // IndexedDBを開く
                     const db = await openDB();
                     const tx = db.transaction(['tiles'], 'readonly');
                     const store = tx.objectStore('tiles');
                     const tileData = await store.get(event.request.url);
                     
                     if (tileData && tileData.blob) {
-                        console.log('Service Worker: タイルをIndexedDBから提供:', event.request.url);
+                        console.log('Service Worker: IndexedDBからタイルを提供:', event.request.url);
                         return new Response(tileData.blob, {
                             headers: {
                                 'Content-Type': 'image/png',
@@ -50,15 +64,15 @@ self.addEventListener('fetch', event => {
                     console.error('IndexedDB読み込みエラー:', err);
                 }
                 
-                // IndexedDBになければネットワークから取得
+                // IndexedDBになければネットワークから
                 try {
                     const response = await fetch(event.request);
                     return response;
                 } catch (err) {
-                    console.error('タイル取得エラー:', err);
-                    // 透明な1x1のPNG画像を返す（エラー回避）
-                    const transparentPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-                    return new Response(atob(transparentPng), {
+                    // オフライン時は透明な画像を返す
+                    console.log('タイル取得失敗（オフライン）:', event.request.url);
+                    const transparentPng = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+                    return new Response(transparentPng, {
                         headers: { 'Content-Type': 'image/png' }
                     });
                 }
@@ -79,7 +93,7 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// IndexedDBを開くヘルパー関数
+// IndexedDBヘルパー
 async function openDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open('OfflineSurveyDB', 2);
