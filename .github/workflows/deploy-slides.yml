@@ -61,81 +61,22 @@ jobs:
               cd "$DATE_DIR" && marp slide.md -o slide.pdf --pdf --allow-local-files && cd ..
               mv "$DATE_DIR/slide.pdf" "output/slides/$DATE_DIR.pdf"
               
-              # HTMLファイルを生成（Markdownビュー用）
-              echo "  Creating Markdown view HTML..."
+              # Markdownファイルをコピー（GitHub Pagesで自動変換）
+              echo "  Copying Markdown..."
+              cp "$DATE_DIR/slide.md" "output/slides/$DATE_DIR.md"
               
-              # HTMLヘッダー部分を作成
-              cat > "output/slides/$DATE_DIR.html" << 'HTML_HEADER'
-            <!DOCTYPE html>
-            <html lang="ja">
-            <head>
-                <meta charset="UTF-8">
-                <title>セミナー資料</title>
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
-                <style>
-                    body {
-                        box-sizing: border-box;
-                        min-width: 200px;
-                        max-width: 980px;
-                        margin: 0 auto;
-                        padding: 45px;
-                    }
-                    .markdown-body {
-                        box-sizing: border-box;
-                        min-width: 200px;
-                        max-width: 980px;
-                        margin: 0 auto;
-                    }
-                    .markdown-body pre {
-                        background-color: #f6f8fa;
-                        padding: 16px;
-                        overflow: auto;
-                        font-size: 85%;
-                        line-height: 1.45;
-                        border-radius: 6px;
-                    }
-                    .markdown-body code {
-                        background-color: rgba(175, 184, 193, 0.2);
-                        padding: 0.2em 0.4em;
-                        margin: 0;
-                        font-size: 85%;
-                        border-radius: 6px;
-                    }
-                    hr {
-                        height: 0.25em;
-                        padding: 0;
-                        margin: 24px 0;
-                        background-color: #e1e4e8;
-                        border: 0;
-                    }
-                    @media (max-width: 767px) {
-                        body { padding: 15px; }
-                    }
-                </style>
-            </head>
-            <body>
-                <article class="markdown-body">
-            HTML_HEADER
+              # 画像パスを調整
+              sed -i "s|!\[\([^]]*\)\](assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" "output/slides/$DATE_DIR.md"
+              sed -i "s|!\[\([^]]*\)\](./assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" "output/slides/$DATE_DIR.md"
+              sed -i "s|!\[\([^]]*\)\](\([^/:)][^)]*\))|![\1]($DATE_DIR/\2)|g" "output/slides/$DATE_DIR.md"
               
-              # タイトルを追加
-              echo "<h1>📅 $DATE_DIR - セミナー資料</h1>" >> "output/slides/$DATE_DIR.html"
-              echo "<hr>" >> "output/slides/$DATE_DIR.html"
+              # HTMLタグの画像パスも調整
+              sed -i "s|<img\([^>]*\)src=\"assets/|<img\1src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.md"
+              sed -i "s|<img\([^>]*\)src=\"./assets/|<img\1src=\"$DATE_DIR/assets/|g" "output/slides/$DATE_DIR.md"
               
-              # Markdownの内容を追加（画像パスを調整しながら）
-              cat "$DATE_DIR/slide.md" | \
-                sed "s|!\[\([^]]*\)\](assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" | \
-                sed "s|!\[\([^]]*\)\](./assets/\([^)]*\))|![\1]($DATE_DIR/assets/\2)|g" | \
-                sed "s|!\[\([^]]*\)\](\([^/:)][^)]*\))|![\1]($DATE_DIR/\2)|g" | \
-                sed 's/^---$/<hr>/g' >> "output/slides/$DATE_DIR.html"
-              
-              # HTMLフッター部分を追加
-              cat >> "output/slides/$DATE_DIR.html" << 'HTML_FOOTER'
-                  </article>
-              </body>
-              </html>
-              HTML_FOOTER
-                            
-                          fi
+              # 重複を防ぐ
+              sed -i "s|$DATE_DIR/$DATE_DIR|$DATE_DIR|g" "output/slides/$DATE_DIR.md"
+            fi
             
             # ハンズオン資料をコピー
             if [ -d "$DATE_DIR/handson" ]; then
@@ -147,10 +88,15 @@ jobs:
       - name: Create Jekyll config
         run: |
           cat > output/_config.yml << 'CONFIG_END'
+          # Jekyll設定
           markdown: kramdown
           highlighter: rouge
+          
+          # プラグイン
           plugins:
             - jekyll-relative-links
+            
+          # Markdownの処理設定
           kramdown:
             input: GFM
             hard_wrap: false
@@ -249,7 +195,7 @@ jobs:
               echo "  <h2>📅 $DATE_DIR</h2>" >> output/index.html
               echo "  <div class=\"links\">" >> output/index.html
               
-              [ -f "output/slides/$DATE_DIR.html" ] && echo "    <a href=\"slides/$DATE_DIR.html\">📝 スライド (Markdown形式)</a>" >> output/index.html
+              [ -f "output/slides/$DATE_DIR.md" ] && echo "    <a href=\"slides/$DATE_DIR\">📝 スライド (Markdown形式)</a>" >> output/index.html
               [ -f "output/slides/$DATE_DIR.pdf" ] && echo "    <a href=\"slides/$DATE_DIR.pdf\" class=\"pdf\">📄 スライド (PDF)</a>" >> output/index.html
               [ -d "output/handson/$DATE_DIR" ] && echo "    <a href=\"handson/$DATE_DIR/\" class=\"handson\">💻 ハンズオン</a>" >> output/index.html
               
