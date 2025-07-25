@@ -2913,78 +2913,197 @@ Express.js 認証システム アーキテクチャ構成図
 
 ## OpenAPIとは？
 
+### OpenAPI規格について
+OpenAPI（旧称：Swagger）は、REST APIを記述するための標準仕様です。
+APIの設計、文書化、テスト、クライアントコード生成などを可能にします。
+OpenAPIの主な特徴
 
----
-
-シングルページアプリケーションについて
-
-ルーティング(APIエンドポイント)のパターンが変わる
-
----
-
-
-ホワイトリストとブラックリスト
+言語非依存 - YAML/JSONで記述し、あらゆるプログラミング言語で利用可能
+機械可読 - 自動的にドキュメントやクライアントコードを生成
+標準化 - OpenAPI Initiative（OAI）により管理される公式仕様
+バージョン - 現在の主流はOpenAPI 3.0/3.1
 
 
 ---
 
-
-TLSについて
-
-
-
----
-
-
-今週の実験
-
-GPS / GNSS ログデータを表示しよう
-
-GPSデータ (地理空間上の時系列データ)は概ねkmlなどが使われてきましたが、最近はGPXが枯れてきて利用しやすいかも。
-
-GeoPackage や Shapefileももちろん使われてきました。
-これから利用しやすくなるであろう形式はGeoParquetです。
-
----
-GPXの例 (基本的にはXMLとして解析が可能です)
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GPSアプリ名">
-  <!-- ウェイポイント -->
-  <wpt lat="35.6580" lon="139.7454">
-    <ele>634</ele>
-    <time>2024-01-01T10:30:00Z</time>
-    <name>東京タワー</name>
-  </wpt>
+OpenAPI yamlの例
+```yml
+openapi: 3.0.3
+info:
+  title: ユーザー管理API
+  description: ユーザー情報を管理するためのREST API
+  version: 1.0.0
   
-  <!-- トラック -->
-  <trk>
-    <name>朝のランニング</name>
-    <trkseg>
-      <trkpt lat="35.6595" lon="139.7466">
-        <ele>45.2</ele>
-        <time>2024-01-01T06:00:00Z</time>
-      </trkpt>
-      <trkpt lat="35.6596" lon="139.7467">
-        <ele>45.5</ele>
-        <time>2024-01-01T06:00:05Z</time>
-      </trkpt>
-      <!-- 続く... -->
-    </trkseg>
-  </trk>
-</gpx>
+servers:
+  - url: https://api.example.com/v1
+    description: 本番環境
+  - url: http://localhost:8080/v1
+    description: 開発環境
+
+paths:
+  /users:
+    get:
+      summary: ユーザー一覧取得
+      description: 登録されている全ユーザーの一覧を取得します
+      operationId: getUsers
+      parameters:
+        - name: limit
+          in: query
+          description: 取得件数の上限
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '500':
+          description: サーバーエラー
+          
+    post:
+      summary: ユーザー作成
+      description: 新規ユーザーを作成します
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: 不正なリクエスト
+          
+  /users/{userId}:
+    get:
+      summary: ユーザー詳細取得
+      description: 指定されたIDのユーザー情報を取得します
+      operationId: getUserById
+      parameters:
+        - name: userId
+          in: path
+          description: ユーザーID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: ユーザーが見つかりません
+          
+    put:
+      summary: ユーザー更新
+      description: 指定されたIDのユーザー情報を更新します
+      operationId: updateUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: ユーザーが見つかりません
+          
+    delete:
+      summary: ユーザー削除
+      description: 指定されたIDのユーザーを削除します
+      operationId: deleteUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: 削除成功
+        '404':
+          description: ユーザーが見つかりません
+
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ユーザーID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: ユーザー名
+          example: "山田太郎"
+        email:
+          type: string
+          format: email
+          description: メールアドレス
+          example: "yamada@example.com"
+        createdAt:
+          type: string
+          format: date-time
+          description: 作成日時
+          example: "2024-01-01T09:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2024-01-15T14:30:00Z"
+          
+    UserInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          description: ユーザー名
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          description: メールアドレス
 ```
-
-
-
----
-
-OpenStreetMap自体をうまく使う
-
----
-
-
 
 
 ---
@@ -3040,7 +3159,252 @@ AWS / Google Cloud / Azure
 * Canva
 * tldraw.io
 
+
+
 ---
+
+## OpenAPIについて
+
+---
+
+## 標準的な開発フロー
+
+```
+1. API設計（OpenAPI仕様書作成）
+        ↓
+2. 仕様書レビュー・承認
+        ↓
+    ┌───────────┴───────────┐
+    ↓                       ↓
+3. バックエンド自動生成    3. フロントエンド自動生成
+    ↓                       ↓
+4. ビジネスロジック実装    4. UI実装
+    ↓                       ↓
+5. 自動テスト             5. 自動テスト
+    ↓                       ↓
+    └───────────┬───────────┘
+                ↓
+6. 統合テスト・デプロイ
+```
+
+
+---
+
+Node.jsとReactのアプリケーションの例で、DBスキーマからAPI仕様書を作って開発を進める例
+
+```
+┌─────────────────────────────────────────────────┐
+│                  1. データベース設計              │
+│                  (ERD/Prisma Schema)             │
+└─────────────────────┬───────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────┐
+│              2. OpenAPI仕様書生成                │
+│            (DB構造から自動生成)                   │
+└─────────────────────┬───────────────────────────┘
+                      ↓
+        ┌─────────────┴─────────────┐
+        ↓                           ↓
+┌───────────────────┐       ┌───────────────────┐
+│ 3A. バックエンド   │       │ 3B. フロントエンド │
+│    自動生成        │       │    自動生成        │
+└───────┬───────────┘       └───────┬───────────┘
+        ↓                           ↓
+┌───────────────────┐       ┌───────────────────┐
+│ 4A. ビジネスロジック│       │ 4B. UI/UX実装     │
+│    実装            │       │    React開発       │
+└───────────────────┘       └───────────────────┘
+```
+
+
+---
+
+```
+my-app/
+├── backend/
+│   ├── prisma/
+│   │   └── schema.prisma
+│   ├── src/
+│   │   ├── generated/      # 自動生成コード
+│   │   ├── services/       # ビジネスロジック
+│   │   └── index.ts
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── api/           # 自動生成APIクライアント
+│   │   ├── components/
+│   │   └── App.tsx
+│   └── package.json
+├── openapi/
+│   └── api-spec.yaml      # 自動生成されるOpenAPI仕様
+└── package.json           # モノレポ管理
+```
+
+ディレクトリ構造こんな感じ？
+
+---
+
+## シングルページアプリケーションについて
+
+### マルチページアプリケーション
+ユーザー操作 → サーバーへリクエスト → HTMLページ全体を返す → ページ全体を再描画
+### シングルページアプリケーションs
+ユーザー操作 → JavaScriptが処理 → 必要なデータのみサーバーから取得 → 画面の一部を更新
+
+## SPAの主な特徴
+
+### 初回読み込み時
+HTML、CSS、JavaScriptを一度に読み込む
+その後はデータ（JSON）のやり取りのみ
+
+### クライアントサイドルーティング
+URLの変更をJavaScriptで制御
+ページ遷移してもサーバーへのリクエストは発生しない
+
+### 状態管理
+アプリケーションの状態をクライアント側で保持
+Redux、Vuex、Recoilなどの状態管理ライブラリを使用
+
+
+---
+
+## 三層アーキテクチャの実践例
+
+```
+┌─────────────┐
+                    │   Nginx     │ ← Webサーバー
+                    │  (Port 80)  │
+                    └──────┬──────┘
+                           │
+            ┌──────────────┼──────────────┐
+            ↓              ↓              ↓
+     ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+     │  Node.js    │ │  Node.js    │ │  Node.js    │ ← APサーバー
+     │ (Port 3001) │ │ (Port 3002) │ │ (Port 3003) │   (複数インスタンス)
+     └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+            └──────────────┼──────────────┘
+                           ↓
+                    ┌─────────────┐
+                    │  PostgreSQL │ ← データベース
+                    └─────────────┘
+```
+
+
+---
+
+
+ホワイトリストとブラックリスト
+
+```conf
+# nginx.conf または site設定ファイル
+
+location /admin {
+    # デフォルトで全て拒否
+    deny all;
+    
+    # 許可するIPを明示的に指定
+    allow 192.168.1.100;
+    allow 192.168.1.101;
+    allow 10.0.0.0/24;      # サブネット指定も可能
+    allow 2001:db8::/32;    # IPv6も対応
+}
+```
+
+```conf
+location / {
+    # 拒否するIPを指定
+    deny 192.168.1.50;
+    deny 10.10.10.0/24;
+    deny 2001:db8:bad::/48;
+    
+    # それ以外は全て許可
+    allow all;
+}
+```
+
+
+
+
+
+---
+
+
+## TLSについて
+
+TLS通信の仕組みと実践
+TLSハンドシェイクの流れ：
+
+クライアント→サーバー：対応する暗号化方式を提示
+サーバー→クライアント：証明書と選択した暗号化方式を返答
+クライアント：証明書を検証し、共通鍵を生成・暗号化して送信
+以降、共通鍵で暗号化通信
+
+
+### Let's Encryptで無料証明書取得：
+```bash
+certbot --nginx -d example.com
+TLSは、公開鍵暗号で鍵交換を行い、その後は高速な共通鍵暗号で実際のデータを暗号化します。これにより、盗聴・改ざん・なりすましを防ぎ、安全な通信を実現します。証明書は認証局（CA）が発行し、ブラウザが検証することで、通信相手の正当性を保証します。
+
+```
+
+
+---
+
+
+## 今週の実験
+
+GPS / GNSS ログデータを表示しよう
+
+GPSデータ (地理空間上の時系列データ)は概ねkmlなどが使われてきましたが、最近はGPXが枯れてきて利用しやすいかも。
+
+GeoPackage や Shapefileももちろん使われてきました。
+これから利用しやすくなるであろう形式はGeoParquetです。
+
+---
+GPXの例 (基本的にはXMLとして解析が可能です)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GPSアプリ名">
+  <!-- ウェイポイント -->
+  <wpt lat="35.6580" lon="139.7454">
+    <ele>634</ele>
+    <time>2024-01-01T10:30:00Z</time>
+    <name>東京タワー</name>
+  </wpt>
+  
+  <!-- トラック -->
+  <trk>
+    <name>朝のランニング</name>
+    <trkseg>
+      <trkpt lat="35.6595" lon="139.7466">
+        <ele>45.2</ele>
+        <time>2024-01-01T06:00:00Z</time>
+      </trkpt>
+      <trkpt lat="35.6596" lon="139.7467">
+        <ele>45.5</ele>
+        <time>2024-01-01T06:00:05Z</time>
+      </trkpt>
+      <!-- 続く... -->
+    </trkseg>
+  </trk>
+</gpx>
+```
+---
+
+# 今週のコラム
+
+---
+
+## 背景レイヤーに欲しい地物が入っていない？？
+
+OpenStreetMapにデータを入力しましょう！ (▶️ デモンストレーション)
+
+ベクターレイヤーには毎週月曜日に編集差分が吸収されます。
+
+---
+
+
 
 ## その他
 
