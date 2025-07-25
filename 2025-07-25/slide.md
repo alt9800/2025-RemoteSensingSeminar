@@ -803,6 +803,40 @@ curl -G https://example.com/api/users \
 
 ---
 
+```
+┌─────────────────────────────────────────────┐
+│                   users                      │
+├─────────────────────────────────────────────┤
+│ PK │ id              │ INTEGER    │ AI      │
+│    │ user_id         │ VARCHAR(50)│ UNIQUE  │
+│    │ email           │ VARCHAR(255)│ UNIQUE │
+│    │ password_hash   │ VARCHAR(255)│        │
+│    │ created_at      │ TIMESTAMP  │ DEFAULT │
+└─────────────────────────────────────────────┘
+                          │
+                          │ 1
+                          │
+                          │
+                          │ *
+┌─────────────────────────────────────────────┐
+│                   posts                      │
+├─────────────────────────────────────────────┤
+│ PK │ id              │ INTEGER    │ AI      │
+│ FK │ user_id         │ INTEGER    │ NOT NULL│
+│    │ latitude        │ REAL       │ NOT NULL│
+│    │ longitude       │ REAL       │ NOT NULL│
+│    │ comment         │ TEXT       │         │
+│    │ image_path      │ VARCHAR(500)│        │
+│    │ created_at      │ TIMESTAMP  │ DEFAULT │
+│    │ updated_at      │ TIMESTAMP  │ DEFAULT │
+└─────────────────────────────────────────────┘
+
+```
+
+
+
+---
+
 ### 特定の投稿を取得
 ```sh
 curl http://localhost:3000/api/posts/1

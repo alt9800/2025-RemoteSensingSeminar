@@ -5,14 +5,14 @@ npm run dev
 
 このフォルダをDLしたばっかりの場合
 
-
+```
 npm install express dotenv cors helmet
 npm install jsonwebtoken bcrypt express-validator
 npm install sqlite3
 npm install --save-dev nodemon
 
 node scripts/init-db.js
-
+```
 
 
 $ curl -X POST http://localhost:3000/api/auth/signup \
