@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="調査ツール">
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==">
+    <title>オフライン現地調査ツール</title>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 300px;
+        }
+        
+        /* iOS Safari standalone mode adjustments */
+        .standalone .controls {
+            top: 30px; /* ステータスバー分の余白 */
+        }
+        
+        .install-prompt {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            display: none;
+        }
+        
+        .install-prompt.visible {
+            display: block;
+        }
+        
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .standalone .controls {
+                top: calc(10px + env(safe-area-inset-top));
+            }
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.online {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .status.offline {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        .status.offline .status-dot {
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 4px;
+            background: #1976d2;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #1565c0;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .progress {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .cache-status {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 13px;
+            display: none;
+        }
+        
+        .cache-status.active {
+            display: block;
+        }
+        
+        .marker-form {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+            width: 90%;
+            max-width: 400px;
+            display: none;
+        }
+        
+        .marker-form.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .form-buttons button {
+            flex: 1;
+        }
+        
+        .cancel-btn {
+            background: #757575;
+        }
+        
+        .marker-popup {
+            font-size: 14px;
+        }
+        
+        .sync-info {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        
+        .location-button {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+        
+        .location-button:hover {
+            background: #f5f5f5;
+        }
+        
+        .location-button.tracking {
+            background: #1976d2;
+            color: white;
+        }
+        
+        #offline-map {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            background: #f0f0f0;
+            position: relative;
+        }
+        
+        #offline-map canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .offline-notice {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="offline-map">
+        <canvas id="offline-canvas"></canvas>
+        <div class="offline-notice">
+            <h3>オフラインマップ</h3>
+            <p>キャッシュされた地図を表示中</p>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="install-prompt" id="ios-install-prompt">
+            <strong>📱 オフライン利用のために：</strong><br>
+            共有ボタン → ホーム画面に追加
+        </div>
+        
+        <div class="status" id="status">
+            <span class="status-dot"></span>
+            <span id="status-text">接続確認中...</span>
+        </div>
+        
+        <button id="cache-tiles">エリアをキャッシュ</button>
+        <button id="add-marker">マーカーを追加</button>
+        <button id="sync-data">データを同期</button>
+        <button id="clear-cache" style="background: #f44336;">キャッシュをクリア</button>
+        <button id="debug-cache" style="background: #9c27b0;">キャッシュをデバッグ</button>
+        
+        <div class="cache-status" id="cache-status">
+            <strong>キャッシュ状態</strong><br>
+            <span id="cache-detail"></span>
+        </div>
+        
+        <div class="progress" id="progress"></div>
+        
+        <div class="sync-info">
+            <div>未同期データ: <span id="pending-count">0</span>件</div>
+            <div>キャッシュタイル: <span id="tile-count">0</span>枚</div>
+            <div>キャッシュサイズ: <span id="cache-size">0</span>MB</div>
+        </div>
+    </div>
+    
+    <button class="location-button" id="location-btn" title="現在地を表示">
+        📍
+    </button>
+    
+    <div class="marker-form" id="marker-form">
+        <h3>調査データ入力</h3>
+        <form id="survey-form">
+            <div class="form-group">
+                <label for="title">タイトル</label>
+                <input type="text" id="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">説明</label>
+                <textarea id="description" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="category">カテゴリ</label>
+                <select id="category" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="observation">観察</option>
+                    <option value="issue">問題箇所</option>
+                    <option value="facility">施設</option>
+                    <option value="other">その他</option>
+                </select>
+            </div>
+            
+            <div class="form-buttons">
+                <button type="submit">保存</button>
+                <button type="button" class="cancel-btn" onclick="hideMarkerForm()">キャンセル</button>
+            </div>
+        </form>
+    </div>
+    
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <script>
+        // 山口市〜宇部市のエリア設定（狭めた範囲）
+        const YAMAGUCHI_UBE_BOUNDS = [
+            [131.0, 33.95],  // 南西（宇部市中心部付近）
+            [131.3, 34.05]   // 北東（少し北側）
+        ];
+        
+        // デフォルトの中心とズーム（宇部市街地）
+        const DEFAULT_CENTER = [131.15, 34.0];
+        const DEFAULT_ZOOM = 12;
+        
+        // グローバル変数
+        let map;
+        let db;
+        let isOfflineMode = false;
+        
+        const DB_NAME = 'OfflineSurveyDB';
+        const DB_VERSION = 2;
+        
+        // カスタムプロトコルの登録（オフライン対応の核心部分）
+        function registerOfflineProtocol() {
+            if (!window.maplibregl) return;
+            
+            // カスタムプロトコルを追加
+            maplibregl.addProtocol('offline', (params, callback) => {
+                // offline://tiles/{z}/{x}/{y} の形式からパラメータを取得
+                const match = params.url.match(/offline:\/\/tiles\/(\d+)\/(\d+)\/(\d+)/);
+                if (!match) {
+                    callback(new Error('Invalid offline URL'));
+                    return;
+                }
+                
+                const [, z, x, y] = match;
+                const tileKey = `${z}/${x}/${y}`;
+                
+                // IndexedDBからタイルを取得
+                (async () => {
+                    try {
+                        if (!db) {
+                            throw new Error('Database not initialized');
+                        }
+                        
+                        const transaction = db.transaction(['tiles'], 'readonly');
+                        const store = transaction.objectStore('tiles');
+                        
+                        // 複数のURL形式を試す
+                        const urls = [
+                            `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+                            `https://tile.openstreetmap.jp/${z}/${x}/${y}.png`
+                        ];
+                        
+                        let tileData = null;
+                        for (const url of urls) {
+                            const getRequest = store.get(url);
+                            const result = await new Promise((resolve, reject) => {
+                                getRequest.onsuccess = () => resolve(getRequest.result);
+                                getRequest.onerror = () => reject(getRequest.error);
+                            });
+                            if (result && result.blob) {
+                                tileData = result;
+                                break;
+                            }
+                        }
+                        
+                        if (tileData && tileData.blob) {
+                            console.log(`オフラインタイル読み込み成功: ${tileKey}`);
+                            // Blobを配列バッファーに変換
+                            const arrayBuffer = await tileData.blob.arrayBuffer();
+                            callback(null, arrayBuffer, null, null);
+                        } else {
+                            console.warn(`オフラインタイルが見つかりません: ${tileKey}`);
+                            // 透明な1x1 PNGを返す
+                            const emptyPng = new Uint8Array([
+                                137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+                                0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0,
+                                0, 13, 73, 68, 65, 84, 120, 218, 98, 0, 0, 0, 0, 2, 0, 0, 5, 0,
+                                1, 226, 38, 5, 155, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130
+                            ]);
+                            callback(null, emptyPng.buffer, null, null);
+                        }
+                    } catch (error) {
+                        console.error('オフラインタイル読み込みエラー:', error);
+                        callback(error);
+                    }
+                })();
+                
+                return { cancel: () => {} };
+            });
+        }
+        
+        // プロトコルを登録
+        registerOfflineProtocol();
+        
+        // Service Worker風のキャッシュマネージャー
+        class TileCacheManager {
+            constructor() {
+                this.tileCache = new Map();
+            }
+            
+            async cacheTilesForBounds(bounds, minZoom, maxZoom) {
+                const tiles = [];
+                const progress = document.getElementById('progress');
+                const cacheStatus = document.getElementById('cache-status');
+                const cacheDetail = document.getElementById('cache-detail');
+                
+                cacheStatus.classList.add('active');
+                
+                // タイル座標の計算
+                for (let z = minZoom; z <= maxZoom; z++) {
+                    const tileBounds = this.getTileBounds(bounds, z);
+                    for (let x = tileBounds.minX; x <= tileBounds.maxX; x++) {
+                        for (let y = tileBounds.minY; y <= tileBounds.maxY; y++) {
+                            tiles.push({ z, x, y });
+                        }
+                    }
+                }
+                
+                const totalTiles = tiles.length;
+                let cachedTiles = 0;
+                let failedTiles = 0;
+                
+                cacheDetail.textContent = `${totalTiles}枚のタイルをキャッシュします`;
+                console.log(`キャッシュ対象タイル数: ${totalTiles}枚`);
+                
+                // タイル数が多すぎる場合は警告
+                if (totalTiles > 200) {
+                    if (!confirm(`${totalTiles}枚のタイルをダウンロードします。続行しますか？`)) {
+                        cacheStatus.classList.remove('active');
+                        progress.textContent = 'キャンセルされました';
+                        return 0;
+                    }
+                }
+                
+                // バッチ処理でタイルをダウンロード
+                const batchSize = 10;
+                for (let i = 0; i < tiles.length; i += batchSize) {
+                    const batch = tiles.slice(i, i + batchSize);
+                    
+                    await Promise.all(batch.map(async (tile) => {
+                        try {
+                            // OpenStreetMapの正しいタイルURL形式
+                            const url = `https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`;
+                            console.log(`タイルをダウンロード: ${url}`);
+                            
+                            const response = await fetch(url, {
+                                mode: 'cors',
+                                credentials: 'omit'
+                            });
+                            
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            
+                            const blob = await response.blob();
+                            
+                            // IndexedDBに保存
+                            const saveTransaction = db.transaction(['tiles'], 'readwrite');
+                            const saveStore = saveTransaction.objectStore('tiles');
+                            
+                            const putRequest = saveStore.put({
+                                url: url,
+                                tileKey: `${tile.z}/${tile.x}/${tile.y}`,
+                                blob: blob,
+                                timestamp: Date.now()
+                            });
+                            
+                            await new Promise((resolve, reject) => {
+                                putRequest.onsuccess = resolve;
+                                putRequest.onerror = () => reject(putRequest.error);
+                            });
+                            
+                            cachedTiles++;
+                            console.log(`タイルをキャッシュしました: ${tile.z}/${tile.x}/${tile.y}`);
+                            
+                        } catch (error) {
+                            console.error(`タイルのキャッシュに失敗: ${tile.z}/${tile.x}/${tile.y}`, error);
+                            failedTiles++;
+                        }
+                        
+                        const percent = Math.round(((cachedTiles + failedTiles) / totalTiles) * 100);
+                        progress.textContent = `キャッシュ中: ${percent}% (成功:${cachedTiles} / 失敗:${failedTiles} / 全体:${totalTiles})`;
+                    }));
+                    
+                    // レート制限対策で少し待機
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                // デバッグ：保存されたタイルを確認
+                const debugTransaction = db.transaction(['tiles'], 'readonly');
+                const debugStore = debugTransaction.objectStore('tiles');
+                const getAllRequest = debugStore.getAll();
+                const allTiles = await new Promise((resolve, reject) => {
+                    getAllRequest.onsuccess = () => resolve(getAllRequest.result);
+                    getAllRequest.onerror = () => reject(getAllRequest.error);
+                });
+                console.log(`IndexedDBに保存されたタイル総数: ${allTiles.length}`);
+                
+                cacheDetail.textContent = `${cachedTiles}枚のタイルをキャッシュしました（失敗: ${failedTiles}枚）`;
+                await this.updateCacheInfo();
+                
+                return cachedTiles;
+            }
+            
+            getTileBounds(bounds, zoom) {
+                const minTile = this.latLngToTile(bounds[0][1], bounds[0][0], zoom);
+                const maxTile = this.latLngToTile(bounds[1][1], bounds[1][0], zoom);
+                
+                return {
+                    minX: Math.floor(Math.min(minTile.x, maxTile.x)),
+                    maxX: Math.floor(Math.max(minTile.x, maxTile.x)),
+                    minY: Math.floor(Math.min(minTile.y, maxTile.y)),
+                    maxY: Math.floor(Math.max(minTile.y, maxTile.y))
+                };
+            }
+            
+            latLngToTile(lat, lng, zoom) {
+                const x = (lng + 180) / 360 * Math.pow(2, zoom);
+                const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom);
+                return { x, y };
+            }
+            
+            async updateCacheInfo() {
+                try {
+                    const transaction = db.transaction(['tiles'], 'readonly');
+                    const store = transaction.objectStore('tiles');
+                    
+                    // count()の結果を適切に待つ
+                    const countRequest = store.count();
+                    const count = await new Promise((resolve, reject) => {
+                        countRequest.onsuccess = () => resolve(countRequest.result);
+                        countRequest.onerror = () => reject(countRequest.error);
+                    });
+                    
+                    document.getElementById('tile-count').textContent = count;
+                    
+                    // サイズの概算（1タイルあたり約50KB）
+                    const estimatedSize = (count * 50 / 1024).toFixed(1);
+                    document.getElementById('cache-size').textContent = estimatedSize;
+                } catch (error) {
+                    console.error('キャッシュ情報の更新エラー:', error);
+                    document.getElementById('tile-count').textContent = '0';
+                    document.getElementById('cache-size').textContent = '0';
+                }
+            }
+        }
+        
+        const tileCache = new TileCacheManager();
+        
+        // IndexedDBの初期化（拡張版）
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    
+                    // マーカーデータ用のオブジェクトストア
+                    if (!db.objectStoreNames.contains('markers')) {
+                        const markerStore = db.createObjectStore('markers', { keyPath: 'id', autoIncrement: true });
+                        markerStore.createIndex('syncStatus', 'syncStatus');
+                        markerStore.createIndex('timestamp', 'timestamp');
+                    }
+                    
+                    // タイルキャッシュ用のオブジェクトストア
+                    if (!db.objectStoreNames.contains('tiles')) {
+                        const tileStore = db.createObjectStore('tiles', { keyPath: 'url' });
+                        tileStore.createIndex('timestamp', 'timestamp');
+                        tileStore.createIndex('tileKey', 'tileKey');
+                    }
+                    
+                    // スタイルキャッシュ用
+                    if (!db.objectStoreNames.contains('styles')) {
+                        db.createObjectStore('styles', { keyPath: 'url' });
+                    }
+                    
+                    // その他のリソース用
+                    if (!db.objectStoreNames.contains('resources')) {
+                        db.createObjectStore('resources', { keyPath: 'url' });
+                    }
+                };
+            });
+        }
+        
+        // オンライン/オフライン状態の管理（改善版）
+        async function updateOnlineStatus() {
+            const status = document.getElementById('status');
+            const statusText = document.getElementById('status-text');
+            const syncBtn = document.getElementById('sync-data');
+            
+            // navigator.onLineは信頼できないので、実際にネットワークテストを行う
+            let isOnline = false;
+            
+            if (navigator.onLine) {
+                // 実際にネットワークに接続できるかテスト
+                try {
+                    const response = await fetch('https://tile.openstreetmap.org/0/0/0.png', {
+                        method: 'HEAD',
+                        mode: 'no-cors',
+                        cache: 'no-store'
+                    });
+                    isOnline = true;
+                } catch (error) {
+                    isOnline = false;
+                }
+            }
+            
+            if (isOnline) {
+                status.className = 'status online';
+                statusText.textContent = 'オンライン';
+                syncBtn.disabled = false;
+                syncBtn.style.opacity = '1';
+                
+                // オンライン復帰時の処理
+                if (isOfflineMode) {
+                    isOfflineMode = false;
+                    showNotification('オンラインに復帰しました', 'success');
+                }
+                isOfflineMode = false;
+            } else {
+                status.className = 'status offline';
+                statusText.textContent = 'オフライン（キャッシュモード）';
+                syncBtn.disabled = true;
+                syncBtn.style.opacity = '0.5';
+                
+                if (!isOfflineMode) {
+                    isOfflineMode = true;
+                    showNotification('オフラインモードで動作中', 'warning');
+                }
+            }
+        }
+        
+        // 定期的にオンライン状態をチェック（30秒間隔）
+        setInterval(updateOnlineStatus, 30000);
+        
+        // 通知表示
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${type === 'success' ? '#4caf50' : type === 'warning' ? '#ff9800' : '#2196f3'};
+                color: white;
+                padding: 12px 24px;
+                border-radius: 4px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                z-index: 1000;
+                animation: slideDown 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // アニメーション用CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideDown {
+                from { transform: translate(-50%, -100%); opacity: 0; }
+                to { transform: translate(-50%, 0); opacity: 1; }
+            }
+            @keyframes slideUp {
+                from { transform: translate(-50%, 0); opacity: 1; }
+                to { transform: translate(-50%, -100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        // Service Workerの登録（Safari対応版）
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    // Service Workerを登録
+                    const registration = await navigator.serviceWorker.register('./service-worker.js', {
+                        scope: './'
+                    });
+                    console.log('Service Worker登録成功:', registration.scope);
+                    
+                    // 更新チェック
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                showNotification('新しいバージョンが利用可能です。リロードしてください。', 'info');
+                            }
+                        });
+                    });
+                    
+                    // iOS Safari用の特別な処理
+                    if (window.navigator.standalone === true) {
+                        console.log('iOS Safari: ホーム画面から起動');
+                        document.body.classList.add('standalone');
+                    }
+                    
+                } catch (error) {
+                    console.error('Service Worker登録エラー:', error);
+                    
+                    // Safari用のフォールバック
+                    if (error.message.includes('Failed to register')) {
+                        showNotification('オフライン機能を有効にするには、このページをホーム画面に追加してください', 'warning');
+                    }
+                }
+            });
+        } else {
+            console.log('このブラウザはService Workerに対応していません');
+        }
+        
+        // 地図の初期化（オフライン対応版）
+        async function initMap() {
+            try {
+                // オフライン時は特別なタイルソースを使用
+                const isOffline = !navigator.onLine;
+                
+                const tileSource = isOffline ? 
+                    ['offline://tiles/{z}/{x}/{y}'] : 
+                    ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'];
+                
+                // スタイルを直接定義（外部JSONに依存しない）
+                const mapStyle = {
+                    version: 8,
+                    sources: {
+                        'osm-tiles': {
+                            type: 'raster',
+                            tiles: tileSource,
+                            tileSize: 256,
+                            attribution: '© OpenStreetMap contributors'
+                        }
+                    },
+                    layers: [{
+                        id: 'osm-tiles',
+                        type: 'raster',
+                        source: 'osm-tiles',
+                        minzoom: 0,
+                        maxzoom: 22
+                    }]
+                };
+                
+                // マップを初期化
+                map = new maplibregl.Map({
+                    container: 'map',
+                    style: mapStyle,  // 常に内部定義のスタイルを使用
+                    center: DEFAULT_CENTER,
+                    zoom: DEFAULT_ZOOM,
+                    hash: true,
+                    maxBounds: [
+                        [130.9, 33.9],
+                        [131.4, 34.1]
+                    ],
+                    fadeDuration: 0,
+                    refreshExpiredTiles: false
+                });
+                
+                console.log(`地図を初期化しました。タイルソース: ${isOffline ? 'オフライン' : 'オンライン'}`);
+                
+                return map;
+            } catch (error) {
+                console.error('マップの初期化エラー:', error);
+                showNotification('地図の初期化に失敗しました', 'error');
+                
+                // エラー詳細を表示
+                const offlineMap = document.getElementById('offline-map');
+                offlineMap.style.display = 'block';
+                document.getElementById('map').style.display = 'none';
+                
+                const notice = offlineMap.querySelector('.offline-notice');
+                notice.innerHTML = `
+                    <h3>地図を表示できません</h3>
+                    <p>エラー: ${error.message}</p>
+                    <p>オンライン時に「エリアをキャッシュ」を実行してください</p>
+                `;
+            }
+        }
+        
+        // マーカー追加モード
+        let isAddingMarker = false;
+        let tempMarker = null;
+        
+        document.getElementById('add-marker').addEventListener('click', () => {
+            isAddingMarker = !isAddingMarker;
+            const btn = document.getElementById('add-marker');
+            
+            if (isAddingMarker) {
+                btn.textContent = 'キャンセル';
+                btn.style.background = '#f44336';
+                if (map) map.getCanvas().style.cursor = 'crosshair';
+            } else {
+                btn.textContent = 'マーカーを追加';
+                btn.style.background = '#1976d2';
+                if (map) map.getCanvas().style.cursor = '';
+                if (tempMarker) {
+                    tempMarker.remove();
+                    tempMarker = null;
+                }
+            }
+        });
+        
+        // マップクリックイベント
+        function setupMapEvents() {
+            if (!map) return;
+            
+            map.on('click', async (e) => {
+                if (!isAddingMarker) return;
+                
+                const { lng, lat } = e.lngLat;
+                
+                // 一時マーカーを表示
+                if (tempMarker) tempMarker.remove();
+                tempMarker = new maplibregl.Marker({ color: '#ff5722' })
+                    .setLngLat([lng, lat])
+                    .addTo(map);
+                
+                // フォームを表示
+                const form = document.getElementById('marker-form');
+                form.classList.add('active');
+                form.dataset.lng = lng;
+                form.dataset.lat = lat;
+            });
+        }
+        
+        // フォーム送信処理
+        document.getElementById('survey-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = document.getElementById('marker-form');
+            const data = {
+                lng: parseFloat(form.dataset.lng),
+                lat: parseFloat(form.dataset.lat),
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                category: document.getElementById('category').value,
+                timestamp: new Date().toISOString(),
+                syncStatus: 'pending'
+            };
+            
+            // IndexedDBに保存
+            await saveMarker(data);
+            
+            // マーカーを地図に追加
+            if (map) addMarkerToMap(data);
+            
+            // フォームをリセット
+            hideMarkerForm();
+            document.getElementById('survey-form').reset();
+            
+            // 追加モードを終了
+            isAddingMarker = false;
+            document.getElementById('add-marker').textContent = 'マーカーを追加';
+            document.getElementById('add-marker').style.background = '#1976d2';
+            if (map) map.getCanvas().style.cursor = '';
+            
+            if (tempMarker) {
+                tempMarker.remove();
+                tempMarker = null;
+            }
+            
+            // 未同期データ数を更新
+            updatePendingCount();
+            
+            showNotification('データを保存しました', 'success');
+        });
+        
+        function hideMarkerForm() {
+            document.getElementById('marker-form').classList.remove('active');
+        }
+        
+        // マーカーをIndexedDBに保存
+        async function saveMarker(data) {
+            const transaction = db.transaction(['markers'], 'readwrite');
+            const store = transaction.objectStore('markers');
+            
+            const addRequest = store.add(data);
+            await new Promise((resolve, reject) => {
+                addRequest.onsuccess = resolve;
+                addRequest.onerror = () => reject(addRequest.error);
+            });
+        }
+        
+        // マーカーを地図に追加
+        function addMarkerToMap(data) {
+            if (!map) return;
+            
+            const marker = new maplibregl.Marker({
+                color: data.syncStatus === 'synced' ? '#4caf50' : '#ff9800'
+            })
+            .setLngLat([data.lng, data.lat])
+            .setPopup(new maplibregl.Popup().setHTML(`
+                <div class="marker-popup">
+                    <h4>${data.title}</h4>
+                    <p>${data.description}</p>
+                    <small>カテゴリ: ${data.category}</small><br>
+                    <small>作成: ${new Date(data.timestamp).toLocaleString()}</small>
+                </div>
+            `))
+            .addTo(map);
+        }
+        
+        // 保存済みマーカーの読み込み
+        async function loadMarkers() {
+            try {
+                const transaction = db.transaction(['markers'], 'readonly');
+                const store = transaction.objectStore('markers');
+                
+                const getAllRequest = store.getAll();
+                const markers = await new Promise((resolve, reject) => {
+                    getAllRequest.onsuccess = () => resolve(getAllRequest.result);
+                    getAllRequest.onerror = () => reject(getAllRequest.error);
+                });
+                
+                markers.forEach(marker => {
+                    if (map) addMarkerToMap(marker);
+                });
+            } catch (error) {
+                console.error('マーカー読み込みエラー:', error);
+            }
+        }
+        
+        // 未同期データ数の更新
+        async function updatePendingCount() {
+            try {
+                const transaction = db.transaction(['markers'], 'readonly');
+                const store = transaction.objectStore('markers');
+                const index = store.index('syncStatus');
+                
+                const countRequest = index.count('pending');
+                const count = await new Promise((resolve, reject) => {
+                    countRequest.onsuccess = () => resolve(countRequest.result);
+                    countRequest.onerror = () => reject(countRequest.error);
+                });
+                
+                document.getElementById('pending-count').textContent = count;
+            } catch (error) {
+                console.error('未同期データ数の更新エラー:', error);
+                document.getElementById('pending-count').textContent = '0';
+            }
+        }
+        
+        // データ同期処理
+        document.getElementById('sync-data').addEventListener('click', async () => {
+            if (!navigator.onLine) {
+                showNotification('オフラインのため同期できません', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('sync-data');
+            btn.disabled = true;
+            btn.textContent = '同期中...';
+            
+            try {
+                // 未同期データの取得
+                const transaction = db.transaction(['markers'], 'readwrite');
+                const store = transaction.objectStore('markers');
+                const index = store.index('syncStatus');
+                
+                const getAllRequest = index.getAll('pending');
+                const pendingMarkers = await new Promise((resolve, reject) => {
+                    getAllRequest.onsuccess = () => resolve(getAllRequest.result);
+                    getAllRequest.onerror = () => reject(getAllRequest.error);
+                });
+                
+                // 実際の実装では、ここでサーバーにデータを送信します
+                console.log('同期するデータ:', pendingMarkers);
+                
+                // デモ用：2秒後に同期完了とする
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // 同期ステータスを更新
+                for (const marker of pendingMarkers) {
+                    marker.syncStatus = 'synced';
+                    const putRequest = store.put(marker);
+                    await new Promise((resolve, reject) => {
+                        putRequest.onsuccess = resolve;
+                        putRequest.onerror = () => reject(putRequest.error);
+                    });
+                }
+                
+                showNotification(`${pendingMarkers.length}件のデータを同期しました`, 'success');
+                updatePendingCount();
+                
+                // マーカーの色を更新
+                if (map) {
+                    map.remove();
+                    await initMap();
+                    map.on('load', async () => {
+                        await loadMarkers();
+                        setupMapEvents();
+                    });
+                }
+                
+            } catch (error) {
+                showNotification('同期に失敗しました: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'データを同期';
+            }
+        });
+        
+        // タイルキャッシュ処理（実装版）
+        document.getElementById('cache-tiles').addEventListener('click', async () => {
+            const btn = document.getElementById('cache-tiles');
+            btn.disabled = true;
+            btn.textContent = 'キャッシュ中...';
+            
+            const progress = document.getElementById('progress');
+            progress.textContent = '準備中...';
+            
+            try {
+                // タイルをキャッシュ（ズームレベル10-14、約100枚程度）
+                const cachedCount = await tileCache.cacheTilesForBounds(
+                    YAMAGUCHI_UBE_BOUNDS,
+                    10,  // 最小ズーム（広域表示）
+                    14   // 最大ズーム（詳細表示）
+                );
+                
+                showNotification(`${cachedCount}枚のタイルをキャッシュしました`, 'success');
+                
+            } catch (error) {
+                showNotification('キャッシュに失敗しました: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'エリアをキャッシュ';
+                progress.textContent = '';
+                
+                setTimeout(() => {
+                    document.getElementById('cache-status').classList.remove('active');
+                }, 5000);
+            }
+        });
+        
+        // デバッグ機能
+        document.getElementById('debug-cache').addEventListener('click', async () => {
+            console.log('=== キャッシュデバッグ開始 ===');
+            
+            // IndexedDBの内容を確認
+            const transaction = db.transaction(['tiles'], 'readonly');
+            const store = transaction.objectStore('tiles');
+            const allTiles = await store.getAll();
+            
+            console.log(`IndexedDBのタイル数: ${allTiles.length}`);
+            
+            if (allTiles.length > 0) {
+                console.log('保存されているタイルのサンプル:');
+                allTiles.slice(0, 5).forEach(tile => {
+                    console.log(`- URL: ${tile.url}`);
+                    console.log(`  Key: ${tile.tileKey}`);
+                    console.log(`  Size: ${tile.blob.size} bytes`);
+                });
+            }
+            
+            // Service Workerの状態を確認
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                console.log(`Service Worker登録数: ${registrations.length}`);
+                registrations.forEach(reg => {
+                    console.log(`- Scope: ${reg.scope}`);
+                    console.log(`  Active: ${reg.active ? 'Yes' : 'No'}`);
+                });
+            }
+            
+            // 現在の地図の状態
+            if (map) {
+                const zoom = map.getZoom();
+                const center = map.getCenter();
+                console.log(`現在の地図状態:`);
+                console.log(`- Zoom: ${zoom}`);
+                console.log(`- Center: ${center.lng}, ${center.lat}`);
+                
+                // 現在表示されるべきタイルを計算
+                const bounds = map.getBounds();
+                const z = Math.floor(zoom);
+                const tileBounds = tileCache.getTileBounds([[bounds.getWest(), bounds.getSouth()], [bounds.getEast(), bounds.getNorth()]], z);
+                console.log(`現在のビューのタイル範囲 (z=${z}):`);
+                console.log(`- X: ${tileBounds.minX} - ${tileBounds.maxX}`);
+                console.log(`- Y: ${tileBounds.minY} - ${tileBounds.maxY}`);
+                
+                // 必要なタイルがキャッシュにあるか確認
+                let foundCount = 0;
+                for (let x = tileBounds.minX; x <= tileBounds.maxX; x++) {
+                    for (let y = tileBounds.minY; y <= tileBounds.maxY; y++) {
+                        const tileKey = `${z}/${x}/${y}`;
+                        const found = allTiles.some(t => t.tileKey === tileKey);
+                        if (found) foundCount++;
+                    }
+                }
+                const totalNeeded = (tileBounds.maxX - tileBounds.minX + 1) * (tileBounds.maxY - tileBounds.minY + 1);
+                console.log(`必要なタイル: ${totalNeeded}枚中${foundCount}枚がキャッシュに存在`);
+            }
+            
+            showNotification('デバッグ情報をコンソールに出力しました', 'info');
+        });
+        
+        // キャッシュクリア
+        document.getElementById('clear-cache').addEventListener('click', async () => {
+            if (!confirm('すべてのキャッシュをクリアしますか？')) return;
+            
+            try {
+                // タイルキャッシュをクリア
+                const transaction = db.transaction(['tiles', 'styles', 'resources'], 'readwrite');
+                
+                // 各ストアをクリア
+                const tilesClear = transaction.objectStore('tiles').clear();
+                const stylesClear = transaction.objectStore('styles').clear();
+                const resourcesClear = transaction.objectStore('resources').clear();
+                
+                // すべてのクリア操作が完了するのを待つ
+                await new Promise((resolve, reject) => {
+                    transaction.oncomplete = resolve;
+                    transaction.onerror = () => reject(transaction.error);
+                });
+                
+                await tileCache.updateCacheInfo();
+                showNotification('キャッシュをクリアしました', 'success');
+                
+            } catch (error) {
+                console.error('キャッシュクリアエラー:', error);
+                showNotification('キャッシュのクリアに失敗しました', 'error');
+            }
+        });
+        
+        // 現在地追跡
+        let geolocateControl = null;
+        document.getElementById('location-btn').addEventListener('click', () => {
+            if (!map) return;
+            
+            if (!geolocateControl) {
+                geolocateControl = new maplibregl.GeolocateControl({
+                    positionOptions: {
+                        enableHighAccuracy: true
+                    },
+                    trackUserLocation: true,
+                    showUserHeading: true
+                });
+                map.addControl(geolocateControl);
+            }
+            
+            geolocateControl.trigger();
+            document.getElementById('location-btn').classList.toggle('tracking');
+        });
+        
+        // 初期化
+        async function init() {
+            try {
+                // 最初にカスタムプロトコルを登録（重要！）
+                registerOfflineProtocol();
+                
+                await initDB();
+                
+                // Service Workerの準備を待つ
+                if ('serviceWorker' in navigator) {
+                    try {
+                        await navigator.serviceWorker.ready;
+                        console.log('Service Worker準備完了');
+                    } catch (e) {
+                        console.log('Service Worker利用不可');
+                    }
+                }
+                
+                // オンライン状態を確認（実際のネットワークテスト）
+                await updateOnlineStatus();
+                await tileCache.updateCacheInfo();
+                
+                // 少し待機してからマップを初期化（プロトコル登録を確実にするため）
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const mapInstance = await initMap();
+                
+                if (mapInstance) {
+                    mapInstance.on('load', async () => {
+                        console.log('Map fully loaded');
+                        await loadMarkers();
+                        await updatePendingCount();
+                        setupMapEvents();
+                        
+                        // 境界ボックスを表示
+                        map.fitBounds(YAMAGUCHI_UBE_BOUNDS, { padding: 50 });
+                        
+                        // iOS Safari用の案内表示
+                        if (window.navigator.standalone === false && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                            document.getElementById('ios-install-prompt').classList.add('visible');
+                        }
+                        
+                        // オフライン時は強制的に再描画
+                        if (!navigator.onLine) {
+                            setTimeout(() => {
+                                map.triggerRepaint();
+                            }, 500);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                showNotification('初期化に失敗しました', 'error');
+            }
+        }
+        
+        // ページ読み込み時に初期化
+        init();
+    </script>
+</body>
+</html>

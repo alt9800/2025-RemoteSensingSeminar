@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>CSV Map with MapLibre GL JS</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script>
+    // MapLibre GL JSで地図を初期化
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+        center: [131.8, 34.0], // 周南市付近の中心座標
+        zoom: 10
+    });
+
+    // 地図のロード完了後にCSVデータを処理
+    map.on('load', async () => {
+        // CSVファイルの取得
+        const response = await fetch('./cultural_properties.csv');
+        const csvText = await response.text();
+
+        // CSVをパース（簡易的なCSVパース処理）
+        const rows = csvText.split('\n').map(row => row.split(','));
+        const headers = rows[0];
+        const data = rows.slice(1);
+
+        // GeoJSON形式に変換
+        const geojson = {
+            type: 'FeatureCollection',
+            features: []
+        };
+
+        const latIndex = headers.indexOf('緯度');
+        const lonIndex = headers.indexOf('経度');
+        const nameIndex = headers.indexOf('名称');
+
+        data.forEach(row => {
+            const lat = parseFloat(row[latIndex]);
+            const lon = parseFloat(row[lonIndex]);
+            const name = row[nameIndex];
+
+            // 緯度経度が有効な場合のみGeoJSONに追加
+            if (!isNaN(lat) && !isNaN(lon) && name) {
+                geojson.features.push({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [lon, lat]
+                    },
+                    properties: {
+                        name: name
+                    }
+                });
+            }
+        });
+
+        // GeoJSONを地図に追加
+        map.addSource('cultural-properties', {
+            type: 'geojson',
+            data: geojson
+        });
+
+        // ポイントレイヤーを追加
+        map.addLayer({
+            id: 'cultural-points',
+            type: 'circle',
+            source: 'cultural-properties',
+            paint: {
+                'circle-radius': 6,
+                'circle-color': '#FF0000',
+                'circle-opacity': 0.8
+            }
+        });
+
+        // ポップアップの設定
+        const popup = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false
+        });
+
+        // マウスホバー時のイベント
+        map.on('mouseenter', 'cultural-points', (e) => {
+            map.getCanvas().style.cursor = 'pointer';
+            const coordinates = e.features[0].geometry.coordinates.slice();
+            const name = e.features[0].properties.name;
+
+            // ポップアップを表示
+            popup.setLngLat(coordinates)
+                 .setHTML(`<h3>${name}</h3>`)
+                 .addTo(map);
+        });
+
+        // マウスが離れたときのイベント
+        map.on('mouseleave', 'cultural-points', () => {
+            map.getCanvas().style.cursor = '';
+            popup.remove();
+        });
+    });
+</script>
+</body>
+</html>
