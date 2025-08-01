@@ -44,8 +44,10 @@ style: |
 
 ## アジェンダ
 
+
 ### デプロイ編
 ### ジオな体験を記録に残そう！(実践編&前回からの課題)
+→先に少しだけアイディアワークショップをやります。
 
 ---
 
@@ -57,15 +59,7 @@ style: |
 
 
 (ハンズオンとしては講師に追従することを必要としませんが、もし、一緒の速度でやりたい場合はそれぞれのアカウントをご用意ください。)
-
-
----
-
-Dockerでやるか ローカルで環境を作るか
-
-サーバーサイドのパッケージ管理について
-
-どこにデプロイするか
+(電話番号とクレジットカードの番号が必要となります。)
 
 
 ---
@@ -82,11 +76,14 @@ Dockerでやるか ローカルで環境を作るか
 
 ---
 
-
-
+## どうやって動かすか / 何を動かすか
 
 * 静的サイトホスティング
-* 
+* 抽象化インフラ(動的サイトホスティング ... とは言わないかも)
+* サーバレス運用
+* VPS運用
+* コンテナレジストリ
+
 
 ---
 
@@ -102,11 +99,32 @@ Linux環境下にNode.jsなどが動く環境を用意して動かします。
 ---
 
 ## そもそもLinux慣れてない方向けのアイディア
-Cloud Run ([Google Cloud]、[さくらインターネット])を試す
 
-Dockerを入れる
+* Cloud Run ([Google Cloud]、[さくらインターネット])を試す
+
+* Dockerを利用して、Linuxに直接構築する
 
 VagrantやVMwareを入れる
+
+---
+
+### ☝️一口メモ Dockerを利用して、Linuxに直接構築する  
+`docker run -it --rm -v $(pwd):/app expresson` のような形でコンテナに入れます。
+
+別タブでコンソールを開いて、
+
+```bash
+# コンテナから外部へファイルをコピー
+docker cp container_name:/path/to/file /host/destination
+```
+
+とすると、起動中のコンテナに対して状態をセーブすることができます。
+
+本番環境: Docker Volume
+開発環境: バインドマウント
+一時的な保存: コピーコマンド
+
+と覚えておくと便利です。
 
 ---
 
@@ -154,7 +172,7 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
                                                │(Images)│
                                                └────────┘
                                               
-
+```
 
 ---
 
@@ -192,6 +210,116 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
 
 ---
 
+# Linuxを実際に動かそう！
+
+---
+
+[無料VPS | XServer VPS](https://vps.xserver.ne.jp/free.php)
+
+---
+
+メールアドレス登録→電話番号認証→サーバーイメージ作成 という手順を踏みます。
+
+---
+
+![](.assets/image1.png)
+
+---
+
+
+![alt text](./assets/image2.png)
+
+
+---
+
+
+![alt text](./assets/image4.png)
+
+---
+
+ssh鍵の作り方
+
+```bash
+$ ssh-keygen
+Generating public/private ed25519 key pair.
+Enter file in which to save the key (/Users/alex/.ssh/id_ed25519): Xserver-20250801
+Enter passphrase for "Xserver-20250801" (empty for no passphrase):
+Enter same passphrase again:
+```
+
+
+---
+
+![alt text](assets/image5.png)
+
+---
+
+![alt text](assets/image6.png)
+
+---
+
+```bash
+# ユーザー一覧を確認
+ls /home
+
+# 新規ユーザー作成
+sudo adduser username
+# ユーザーのパスワード設定
+sudo passwd username
+# sudoグループに追加（Ubuntu/Debian系）
+sudo usermod -aG sudo username
+
+```
+
+
+---
+
+ここから先は、動いているホストの確認と、NGINXの導入、SSL対応をデモします。
+
+できるだけrootユーザーによるSSHは禁止した方が良いでしょう。
+
+
+---
+## 一定額で使いやすいVPS
+
+ConoHa VPS / さくらのVPS / AWS Lightsail
+
+
+---
+
+# Docker編
+
+[AppRun β コントロールパネル](https://secure.sakura.ad.jp/apprun/applications)
+
+---
+
+アプリケーションを作成
+
+---
+
+[AppRun β版 | さくらのクラウド マニュアル](https://manual.sakura.ad.jp/cloud/manual-sakura-apprun.html)
+
+[コンテナレジストリ | さくらのクラウド マニュアル](https://manual.sakura.ad.jp/cloud/appliance/container-registry/index.html)
+
+---
+
+## 気をつけるべきこと
+
+* Dockerコンテナのサイズ
+* ビルドイメージ
+* 環境変数
+
+
+---
+
+```
+docker login
+```
+
+
+---
+
+
 ## トレンドの話
 
 
@@ -211,6 +339,7 @@ https://github.com/cloudflare/workerd/pull/4549
 
 
 
+---
 
 ## オリジンとは？
 
@@ -229,6 +358,10 @@ PLATEAUのデータを使っていろいろ...
 
 * マインクラフトに変換する
 
+
+---
+
+![alt text](./assets/image3.png)
 
 ---
 
@@ -259,6 +392,12 @@ osm2pgsql -c -d osm -S openstreetmap-carto.style japan.osm.pbf
 # OpenMapTilesでタイル生成
 docker run -v $(pwd):/data openmaptiles/openmaptiles-tools generate-vectortiles
 ```
+
+---
+
+### 確認メールの送信のおすすめ
+
+ReSend / SendGrid
 
 ---
 
