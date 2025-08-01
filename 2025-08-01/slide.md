@@ -291,9 +291,11 @@ ConoHa VPS / さくらのVPS / AWS Lightsail
 
 [AppRun β コントロールパネル](https://secure.sakura.ad.jp/apprun/applications)
 
+[コンテナレジストリ一覧](https://secure.sakura.ad.jp/cloud/iaas/#!/appliance/containerregistry/)
+
 ---
 
-アプリケーションを作成
+アプリケーションをDocker用に修正
 
 ---
 
@@ -312,10 +314,8 @@ ConoHa VPS / さくらのVPS / AWS Lightsail
 
 ---
 
-```
-docker login
-```
 
+コンテナレジストリに登録→コンテナイメージを選択して、起動するコンテナの設定を行う
 
 ---
 
@@ -338,11 +338,9 @@ https://github.com/cloudflare/workerd/pull/4549
 # Supabaseを使おう！
 
 
-
 ---
 
 ## オリジンとは？
-
 
 ---
 
