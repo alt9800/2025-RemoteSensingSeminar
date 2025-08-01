@@ -100,7 +100,7 @@ Linux環境下にNode.jsなどが動く環境を用意して動かします。
 
 ## そもそもLinux慣れてない方向けのアイディア
 
-* Cloud Run ([Google Cloud]、[さくらインターネット])を試す
+* Cloud Shell ([Google Cloud](https://cloud.google.com/shell/docs/using-cloud-shell?hl=ja)、[さくらインターネット](https://www.sakura.ad.jp/services/cloudshell/))を試す
 
 * Dockerを利用して、Linuxに直接構築する
 
