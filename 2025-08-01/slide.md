@@ -108,8 +108,12 @@ VagrantやVMwareを入れる
 
 ---
 
-### ☝️一口メモ Dockerを利用して、Linuxに直接構築する  
-`docker run -it --rm -v $(pwd):/app expresson` のような形でコンテナに入れます。
+### ☝️一口メモ : Dockerを利用して、コンテナ内のLinuxにログインできます。  
+`docker run -it --rm -v $(pwd):/app expresson` のような形でコンテナに入れます。(sshで接続します)
+
+`docker run` コマンドにはさまざまなサブコマンドが用意されていて、ログイン時の設定や利用したい環境変数、ユーザ設定などを記載することもできる他、これらをDockerfile内に記載することも可能です。
+
+---
 
 別タブでコンソールを開いて、
 
@@ -121,16 +125,35 @@ docker cp container_name:/path/to/file /host/destination
 とすると、起動中のコンテナに対して状態をセーブすることができます。
 
 本番環境: Docker Volume
-開発環境: バインドマウント
-一時的な保存: コピーコマンド
+開発環境: バインドマウント(**/mnt**)
+一時的な保存: コピー(`docker cp`)コマンド
 
-と覚えておくと便利です。
+と覚えておくと便利です。(もとからコンテナとホストマシン(Win|Mac)で共有するフォルダを指定しておくことをお勧めします。)
 
 ---
 
 ## AWSで動かす
 
 EC2 は基本的にVPSのように使うことができます。
+sshとして接続する際はAWSサービスの外側に対して接続可能なIPアドレスがListenしている必要がありますが、ガイドラインを見る限り現在でもそんなに接続に手間はないようです(.pemファイルを渡すだけ。)
+
+(講師としてはちゃんとRoute53などを用意した方がいいのかと思っていましたがそこまで仰々しいパスを用意しなくても良い様子)
+
+[SSH クライアントを使用して Linux インスタンスに接続する - Amazon Elastic Compute Cloud](https://docs.aws.amazon.com/ja_jp/AWSEC2/latest/UserGuide/connect-linux-inst-ssh.html)
+
+
+---
+
+ちなみにWindowsマシンをAWSで動かして、リモートデスクトップを用いて、GUIで接続する方法もあります。
+
+[RDP を使用した Windows インスタンスへの接続 - Amazon Elastic Compute Cloud](https://docs.aws.amazon.com/ja_jp/AWSEC2/latest/UserGuide/connecting_to_windows_instance.html)
+
+同様の方針で、LinuxもGUIで接続したい場合は、ソフトウェアとしてGUIを導入することができます(**仮想デスクトップ**というワードで検索すると良いです。**Lubuntu**などが軽くておすすめ。VNCで接続する方法もあります。)
+
+---
+
+☝️ 日本語環境だと多くの場合、Virtualを「仮想の」と訳すことが多いですが、原義としては「実質的な」という意味で捉えた方が良いです。
+そもそもGUI自体もプログラム(プラグイン)であるので、仮想デスクトップという単語自体に問題があるかもしれません。
 
 ---
 
@@ -138,7 +161,7 @@ EC2 は基本的にVPSのように使うことができます。
 
 ```
 ┌─────────────┐     ┌─────────────────┐     ┌──────────────┐
-│   Route 53  │────▶│  EC2インスタンス  │────▶│  EBS Volume  │
+│   Route 53  │─────│  EC2インスタンス  │─────│  EBS Volume  │
 │    (DNS)    │     │  - Node.js      │     │  - SQLite    │
 └─────────────┘     │  - Express.js   │     │  - Uploads   │
                     │  - PM2          │     └──────────────┘
@@ -157,18 +180,19 @@ root権限がなく、限定的な動作ができるサーバーと捉えてく�
 Heroku、Fly.io、Render、Railwayなど独立したPaaSが存在します。
 
 ---
+
 Elastic Beanstalkを中心に考えるならこんな感じ？
 
 ```
 
 ┌────────────┐     ┌──────────────────┐     ┌────────────┐
-│ CloudFront │────▶│ Elastic Beanstalk│────▶│    RDS     │
+│ CloudFront │─────│ Elastic Beanstalk│─────│    RDS     │
 │   (CDN)    │     │  - Node.js       │     │ (PostgreSQL)│
 └────────────┘     │  - Auto Scaling  │     └────────────┘
                    │  - Load Balancer │            │
                    └──────────────────┘            ▼
                             │                  ┌────────┐
-                            └─────────────────▶│   S3   │
+                            └─────────────────>│   S3   │
                                                │(Images)│
                                                └────────┘
                                               
@@ -185,6 +209,8 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
 * Backend as a Service
 
 などなど
+正確な切り分けは難しいですが、サーバーを置くためのサービスと考えると良いでしょう。
+モバイルのバックエンドに特化して、`MBaaS`を謳うサービスもあります。
 
 
 
@@ -197,9 +223,9 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
 (〇〇Function のような名前のサービスであることが多いです。)
 
 
-
 ---
 
+### 著名クラウドサービスの区分け
 
 ||VPS|非rootサーバー|サーバレス|
 |---|---|---|---|
@@ -210,19 +236,19 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
 
 ---
 
-# Linuxを実際に動かそう！
+# Linuxサーバーを作成し、講義中に構成したサービスを動かして見よう！
 
 ---
+
+## XServerを利用します。
 
 [無料VPS | XServer VPS](https://vps.xserver.ne.jp/free.php)
-
----
 
 メールアドレス登録→電話番号認証→サーバーイメージ作成 という手順を踏みます。
 
 ---
 
-![](.assets/image1.png)
+![img](.assets/image1.png)
 
 ---
 
@@ -279,6 +305,12 @@ sudo usermod -aG sudo username
 できるだけrootユーザーによるSSHは禁止した方が良いでしょう。
 
 
+
+---
+
+scp -r -i ~/.ssh/Xserver-20250801 ~/Documents/works/山口産技RESTEC2025/2025-RemoteSensingSeminar/2025-07-25/handson/3-map tnk@x162-43-31-95.static.xvps.ne.jp:/home/tnk
+
+
 ---
 ## 一定額で使いやすいVPS
 
@@ -314,8 +346,39 @@ ConoHa VPS / さくらのVPS / AWS Lightsail
 
 ---
 
+## ライブコーディング中に出会ったエラー
+
+```bash
+ => ERROR [builder 4/6] RUN npm ci --only=production                          2.2s
+------
+ > [builder 4/6] RUN npm ci --only=production:
+1.159 npm warn config only Use `--omit=dev` to omit dev dependencies from the install.
+2.032 npm error code EUSAGE
+2.032 npm error
+2.032 npm error The `npm ci` command can only install with an existing package-lock.json or
+2.032 npm error npm-shrinkwrap.json with lockfileVersion >= 1. Run an install with npm@5 or
+2.032 npm error later to generate a package-lock.json file, then try again.
+2.032 npm error
+2.032 npm error Clean install a project
+2.032 npm error
+2.032 npm error Usage:
+2.032 npm error npm ci
+2.032 npm error
+2.032 npm error Options:
+2.032 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+```
+
+→ `npm ci --only=production` を `npm install` に変更<br>もしくは、npm installを事前にかけて置くとciを突破できる模様
+
+
+---
+
 
 コンテナレジストリに登録→コンテナイメージを選択して、起動するコンテナの設定を行う
+
+---
+
+maphandson2025-08-01.sakuracr.jp/field-survey-app:latest
 
 ---
 
@@ -344,7 +407,7 @@ https://github.com/cloudflare/workerd/pull/4549
 
 ---
 
-Jamstackという考え方
+## Jamstackという考え方
 
 ---
 
@@ -366,12 +429,7 @@ PLATEAUのデータを使っていろいろ...
 * DEMを表示
 * 天気予報図を作ろう
 * [地図記号](https://www.gsi.go.jp/kohokocho/map-sign-tizukigou-2022-itiran.html)を使って地形図を作ろう(地図帳でよく見るやつ)
-
----
-
-空想地図コンバータ
-
-OpenGeoFiction
+* 空想地図コンバータ(OpenGeoFictionを使った空想地図作成など)
 
 ---
 
@@ -393,11 +451,6 @@ docker run -v $(pwd):/data openmaptiles/openmaptiles-tools generate-vectortiles
 
 ---
 
-### 確認メールの送信のおすすめ
-
-ReSend / SendGrid
-
----
 
 ```bash
 # pg_tileservを使用（リアルタイム配信）
@@ -432,10 +485,8 @@ tippecanoe -o output.pmtiles \
 
 ---
 
-この講義を通しての振り返り
+# この講義を通しての振り返り
 
-
----
 
 昨年度のセミナー内容は、
 ### Web開発初心者でもWebGISに触れるようにしよう！
@@ -443,3 +494,34 @@ tippecanoe -o output.pmtiles \
 今年度(2025年度)セミナーでは、そこから一歩進んで、**DBを含んだ永続的なデータの保存環境、Webへのデプロイを含めたWeb開発の全体像を学ぶ**ことを目指しました。
 
 ---
+
+## おまけ
+
+---
+
+### 確認メールの送信のおすすめ
+
+認証において二段階認証で本人確認をするお話で、メール認証について触れましたが、
+メールを送るためのAPIが公開されているサービスもあります。
+
+ReSend / SendGrid
+
+
+---
+
+## 今回の講義で紹介した書籍
+
+[Software Design総集編【2018～2023】 | 技術評論社](https://gihyo.jp/book/2024/978-4-297-14471-5)
+
+
+
+---
+
+書籍としてお持ちした、PLATEAUアカデミーで配布される*マニュアル*は、G空間センターやAIGIDにお尋ねするといただけるそうです。(2024年末の情報)
+
+今年度2025年度も各地で開講されます。
+
+土地計画基礎調査で市町村に各測量会社さんが作られたデータに対して各種属性や3Dモデルの情報の付加、CityGMLの検修などが対象範囲です。
+非常に人手がかかる作業で、関わられる会社さんが増えることを応援しています。
+
+[PLATEAUアカデミー | (一社)社会基盤情報流通推進協議会](https://aigid.jp/plateauacademy/)
