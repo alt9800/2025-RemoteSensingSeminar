@@ -1,4 +1,20 @@
+# docker-compose を使ってAppRunで動くコンテナをビルドしたい場合
 
+## さくらのコンテナレジストリの場合
+docker login your-registry.sakura.ne.jp
+
+## スクリプトに実行権限を付与
+chmod +x build-and-push.sh
+
+## 環境変数を設定してビルド
+export REGISTRY_URL="your-registry.sakura.ne.jp"
+export TAG="v1.0.0"
+./build-and-push.sh
+
+
+---
+
+コマンドを使ってコンテナをビルドしたい場合
 
 ```bash
 
@@ -10,20 +26,6 @@ docker buildx inspect --bootstrap
 
 
 ```
-
-docker-compose など、プロダクションに向けた修正
-
-
-###  さくらのコンテナレジストリの場合
-docker login your-registry.sakura.ne.jp
-
-###  スクリプトに実行権限を付与
-chmod +x build-and-push.sh
-
-###  環境変数を設定してビルド
-export REGISTRY_URL="your-registry.sakura.ne.jp"
-export TAG="v1.0.0"
-./build-and-push.sh
 
 
 ----

@@ -248,7 +248,22 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
 
 ---
 
-![img](.assets/image1.png)
+## デモンストレーション
+
+---
+
+☝️ 任意のコマンドライン(CLI)を用意しましょう
+
+sshに限って言えば、WindowsだとTeratermが便利で、また、VSCodeからリモートマシンに接続して操作、コーディングを行うことも可能です。
+GitbushやPuTTYを利用してsshする場合もこれに準拠します。
+
+[Visual Studio Code で SSH を使用してリモート マシン上で開発を行う - Training | Microsoft Learn](https://learn.microsoft.com/ja-jp/training/modules/develop-on-remote-machine/)
+
+---
+
+GUIが存在しないのと、Webアプリケーションが動けば良いので、4GBで足りないことはほぼないと思います。
+
+![img](./assets/image1.png)
 
 ---
 
@@ -258,21 +273,23 @@ Elastic Beanstalkを中心に考えるならこんな感じ？
 
 ---
 
+rootパスワードは十分に強力なものを設定しましょう。(講師はターミナルなどでランダムな文字列を生成するコマンドを利用しています。<span class="tiny-text">ランダムと言いつつパターンがあったらハックされうるのでは？？</span>)
 
 ![alt text](./assets/image4.png)
 
 ---
 
-ssh鍵の作り方
+### ssh鍵の作り方
+前ページの「SSH Key > インポート」で貼り付ける鍵の作り方を示します。
+**公開鍵(.pubとつく方)**を貼り付けます。
 
 ```bash
 $ ssh-keygen
 Generating public/private ed25519 key pair.
-Enter file in which to save the key (/Users/alex/.ssh/id_ed25519): Xserver-20250801
+Enter file in which to save the key (~/.ssh/id_ed25519): Xserver-20250801
 Enter passphrase for "Xserver-20250801" (empty for no passphrase):
 Enter same passphrase again:
 ```
-
 
 ---
 
@@ -280,41 +297,163 @@ Enter same passphrase again:
 
 ---
 
+申し込み完了後、[ダッシュボード](https://secure.xserver.ne.jp/xvps/vps/setting/port/input)より、ブラウザでコンソール(CLI)を立ち上げることができます。
+
+登録時に指定したパスワードは**root**ユーザーのもので、
+`Login : root `とし、その後にパスワードを入力します。
+
 ![alt text](assets/image6.png)
 
+上記の図では、一度ログインに失敗していますが、`Welcome~~`が出るとログイン成功です。パスワードはコンソール上に表示されません。
+
 ---
+
+Linux環境においては**root**ユーザーのみが用意されていることが多く、この環境でも同様で、まずは**一般ユーザー**を作る必要があります。
 
 ```bash
 # ユーザー一覧を確認
 ls /home
-
 # 新規ユーザー作成
 sudo adduser username
 # ユーザーのパスワード設定
 sudo passwd username
 # sudoグループに追加（Ubuntu/Debian系）
 sudo usermod -aG sudo username
+```
 
+デモでは`tnk`ユーザーを作成しました。
+
+
+---
+
+デモではssh用の公開鍵を事前にサーバに渡していましたが、これはサーバを建てた際に`/root/.ssh`に配置されている`authorized_keys`ファイルに存在していますが、一般ユーザの領域においては存在しないので、
+
+```bash
+# rootで実行
+cp /root/.ssh/authorized_keys /home/user1/.ssh/
+chown user1:user1 /home/user1/.ssh/authorized_keys
+chmod 600 /home/user1/.ssh/authorized_keys
+chmod 700 /home/user1/.ssh
+```
+
+のように、`user1`ユーザーとしてログインする際にも公開鍵を利用するようにします。
+
+---
+
+さらに、X-ServerのWebコンソールより、sshで利用する22番ポートが利用できる状態になっているかを確かめます。
+その後、たとえば`root`アカウントだと
+
+```bash
+ssh -p 22 -i ~/.ssh/Xserver-20250801 root@x162-43-31-95.static.xvps.ne.jp
+```
+のような形でログインができます。
+
+
+```bash
+ssh -p {ポート番号} -i {どの秘密鍵を提示するか} {ユーザ名}@{ホスト名やIPアドレス}
+```
+のような構成です。
+
+---
+
+デモ中のハマりどころとしては、
+`Are you sure you want to continue connecting (yes/no/ [fingerprint])?`
+と表示した際に空白のままEnter押してしまいましたが、ここで`yes`を明示的に入力すべきでした。
+ここで、接続が確立されるとローカル側の` ~.ssh/known_hosts`に通信が記載されます。(VScodeなどで確認が可能です。)
+
+Windowsでは通常は`C:\Users\ユーザー名\.ssh\known_hosts`に記載されます。
+
+
+---
+
+特定のポートが接続可能かどうかはローカルマシンから
+```bash
+curl -v telnet://リモートサーバーアドレス:ポート番号
+```
+のような形式で確かめるか、telnetコマンドなどが現在でも利用できます。
+また、リモートサーバーにWebコンソールからログインしている場合には、
+
+```bash
+Netid  State   Recv-Q  Send-Q  Local Address:Port        Peer Address:Port  Process
+udp    UNCONN  0       0       127.0.0.54:53             0.0.0.0:*
+udp    UNCONN  0       0       127.0.0.53%lo:53          0.0.0.0:*
+tcp    LISTEN  0       4096    127.0.0.54:53             0.0.0.0:*
+tcp    LISTEN  0       4096    127.0.0.53%lo:53          0.0.0.0:*
+tcp    LISTEN  0       4096    0.0.0.0:22                0.0.0.0:* 👈
+tcp    LISTEN  0       4096    [::]:22                   [::]:*    👈
+```
+のように確かめることができます。
+
+---
+
+sshでアクセスができることが確かめられたら、ローカルで動いているアプリケーションをリモートサーバーにアップロードします。
+scpやsftpソフトウェアによるファイルの送信はssh通信を使うので、前述の処理が必要でした。
+
+以下、scpコマンドで、第5回までに完成したソフトウェアをアップロードします。
+```
+scp -r -i ~/.ssh/Xserver-20250801 ~/2025-RemoteSensingSeminar/2025-07-25/handson/3-map user1@x162-43-31-95.static.xvps.ne.jp:/home/user1
+```
+
+---
+
+scpコマンドが成功したら、sshを行って、サーバーで作業をします。
+今回のアプリケーションは、node.jsとnpmが動けば良いので、
+一般ユーザでログインした状態で
+```bash
+sudo apt install nodejs
+# node -v で確かめる
+sudo apt install npm
+# npm -v で確かめる
+```
+をした後に、プロジェクトフォルダに移動 (`cd 3-map`) して、
+```bash
+npm install
+```
+すると実行準備が整います。
+
+---
+
+💡 node.js環境なので、Javascriptのライブラリ集がダウンロードすればこれくらいの環境構築で済みますが、Pythonや、Rubyなどを利用したい場合は、`apt`などを用いてこれらの実行環境を整える必要があります。
+
+
+---
+
+
+### 実行
+
+事前に22番ポートが利用できる設定をしましたが、この時点で、同様にWebコンソールから、3000ポートや443ポートにアクセスできるように設定しておきましょう。
+
+```bash
+npm run dev
+```
+
+ポート3000での待受が始まったら、実際にアクセスできるか確かめましょう！
+
+```
+# 講義中にアクセスした例 : 現在は無効化されています。
+http://x162-43-31-95.static.xvps.ne.jp:3000/ 
 ```
 
 
 ---
 
-ここから先は、動いているホストの確認と、NGINXの導入、SSL対応をデモします。
+## デモで対応しなかった範囲
 
-できるだけrootユーザーによるSSHは禁止した方が良いでしょう。
+* rootユーザーによるSSHは禁止
+* NGINXの導入、SSL対応
 
+特に、SSL対応を行わないと、GeoLocationAPIなどの情報取得が制限される他、DBへのPOSTのアクセスが拒否されることも多いです。
+
+(ここでLocalhostだと `http://` だったはず...と思った方は鋭くて、Localhostは挙動が特殊です。また、localhostでもSSL通信を利用する方法もあります。)
 
 
 ---
 
-scp -r -i ~/.ssh/Xserver-20250801 ~/Documents/works/山口産技RESTEC2025/2025-RemoteSensingSeminar/2025-07-25/handson/3-map tnk@x162-43-31-95.static.xvps.ne.jp:/home/tnk
-
-
----
 ## 一定額で使いやすいVPS
 
-ConoHa VPS / さくらのVPS / AWS Lightsail
+* ConoHa VPS
+* さくらのVPS
+* AWS Lightsail
 
 
 ---
@@ -327,7 +466,11 @@ ConoHa VPS / さくらのVPS / AWS Lightsail
 
 ---
 
-アプリケーションをDocker用に修正
+## アプリケーションをDocker用に修正
+
+https://github.com/alt9800/2025-RemoteSensingSeminar/tree/main/2025-08-01/handson/expressonDocker
+
+具体的にはDockerfileやDocker-compose.ymlなどを修正しています。
 
 ---
 
@@ -339,10 +482,73 @@ ConoHa VPS / さくらのVPS / AWS Lightsail
 
 ## 気をつけるべきこと
 
-* Dockerコンテナのサイズ
-* ビルドイメージ
-* 環境変数
+#### Dockerコンテナのサイズ 
+シングルバイナリにビルドできるような実行環境(Goなど)が相性がよく、一方でJVMのようなインタープリタを実行する環境が少し相性が良くないと感じます。
+#### ビルドイメージ
+arm CPUを積んだPCが増えてきているので注意しておくと、コンテナを登録する(アップロードする)レジストリがx86_64アーキテクチャである場合、そのままarm64やM1 Macなどでビルドしただけでは動作しません。
+そのため、Dockerコンテナをビルドする際に明示的にx86_64を指定してあげましょう。
+#### 環境変数
+コンテナ環境に限りませんが、マシン側で環境変数を平文で設定したくはないので、ビルドの際にコマンドとして与えてあげると、DockerFileなどに記載するよりもよりセキュアだと思います。
 
+---
+
+基本的にはDockerは**「PCごとの実行環境の差分を吸収してくれる」**ための仮想化環境である、と説明していましたが、
+実際にはホストマシン側のリソースを利用して計算を行っている都合上、CPUアーキテクチャが違うと命令セットが違うため、それぞれのCPUに最適化されたコンテナでは利用するカーネルで混乱してしまい実行がなされません。
+
+```
+アプリケーション層
+    ↓
+Docker コンテナ
+    ↓
+Docker Engine
+    ↓
+ホストOS のカーネル  ← ここでCPU命令を実行
+    ↓
+CPU (ARM or x86_64)
+```
+
+
+---
+
+## まずは事前にコンテナレジストリにコンテナイメージを登録しましょう！
+
+さくらインターネットにログイン後、
+https://secure.sakura.ad.jp/cloud/iaas/#!/appliance/containerregistry/
+にアクセスし、
+[左側メニュー]グローバル > コンテナレジストリの画面を開き、「＋ボタン」から、コンテナイメージを追加します。
+
+
+---
+
+慣れないうちは権限を`Pull & Push`にしておきましょう。
+
+![w 600](./assets/image7.png)
+
+---
+
+コンテナレジストリが作られたら、イメージをPushするためにユーザを作成しましょう。
+
+![](./assets/image8.png)
+
+---
+
+[Readme](./handson/expressonDocker/README.md)にも記載していますが、AppRunで動くコンテナはレジストリに登録しておく必要があり、
+講義のコード群だと以下のようなコマンドを用いてコンテナをビルドし、AppRunのレジストリにコンテナをアップロードします。
+
+```
+## さくらのコンテナレジストリの場合
+docker login your-registry.sakura.ne.jp
+
+## スクリプトに実行権限を付与
+chmod +x build-and-push.sh
+
+## 環境変数を設定してビルド
+export REGISTRY_URL="your-registry.sakura.ne.jp"
+export TAG="v1.0.0"
+./build-and-push.sh
+```
+
+レジストリ名はレジストリページに記載のある、ユーザ自身が決めたURI(URL)です。
 
 ---
 
@@ -368,61 +574,130 @@ ConoHa VPS / さくらのVPS / AWS Lightsail
 2.032 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
 ```
 
-→ `npm ci --only=production` を `npm install` に変更<br>もしくは、npm installを事前にかけて置くとciを突破できる模様
+→ `npm ci --only=production` を `npm install` に変更<br>もしくは、npm installを事前にかけて置くとciを突破できる模様です。
+
+
+---
+
+## App Run側の設定
+
+次は、レジストリに登録したコンテナをAppRun側で利用するように設定していきます。
+
+https://secure.sakura.ad.jp/cloud/#/catalog
+
+---
+
+![alt text](./assets/image9.png)
+
 
 
 ---
 
 
-コンテナレジストリに登録→コンテナイメージを選択して、起動するコンテナの設定を行う
+![](./assets/image10.png)
+
+---
+コンテナのアクセス待受ポート番号は80のままでも、コンテナ前段のWebサーバがWell-knownポートを探してくれるようで、3000ポートをNode.jsが利用する設定でも問題なくアクセスできます。
+![w:900](./assets/image11.png)
 
 ---
 
-maphandson2025-08-01.sakuracr.jp/field-survey-app:latest
+先ほどのレジストリで決めたイメージのURLとイメージタグを指定します。
+以下が例です。
+`clematis2025-08-01.sakuracr.jp/field-survey-app:latest`
+
+![w:700](./assets/image12.png)
+
+コンテナレジストリが非公開の場合、ここでユーザの情報を指定してあげるとセキュアにレジストリを扱えます。
+
+---
+
+コンテナを作成して、ステータスが「🟢 正常」になれば、
+提示されるURL `https://app-{ハッシュ値}.ingress.apprun.sakura.ne.jp/` より、サーバにアクセスできます。
+
+お疲れ様でした。
+
+---
+
+ちなみに、ビルドしたDockerイメージは仮想マシン内に保存されていますが、
+```
+# Macの例
+~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw
+```
+必要がなくなればイメージおよび、ビルドキャッシュは適宜削除しましょう。
+
+```bash
+docker system df
+```
+で占有リソースを確認後、
+
+```bash
+docker system prune
+docker rmi field-survey-app:latest
+```
+などで適切にリソースを解放してあげましょう。
 
 ---
 
 
-## トレンドの話
+# トレンドの話
 
 
 ---
 
-# Cloudflareを使おう！
+## [Cloudflare](https://www.cloudflare.com/ja-jp/)を使おう！
+
+CloudflareはCDNのみならず、無料範囲でサービス運営を始めやすく、AWS互換のKVS(あるいはRDBMS)やストレージサーバを持っており、ホスティングやサーバレス設計ができる基盤です。
+
+(日本語のドキュメントがAWSに輪をかけて不足している印象はあります。)
+
+SSL通信も無料範囲で提供されます。
 
 ---
+
+
+実体をR2(オブジェクトストレージ)に置くよりも、Cloudflare Pagesを利用すべきですし、
+さらにはWorkersを使うように推奨されています。
+現在ではExpressがCloudflareでは動かないのですが、issueが立っているのでそのうち動くようになる可能性が高いです。(需要もありますし)
 
 ExpressがCloudflare Workersで動くようになるかも
 https://github.com/cloudflare/workerd/pull/4549
 
 
----
-
-# Supabaseを使おう！
-
+Cloudflare環境だと[Hono.js](https://hono.dev)が認証周りが非常に楽なのでこちらを利用すると良いと思います。
 
 ---
 
-## オリジンとは？
+### [Supabase](https://supabase.com)を使おう！
+
+FirebaseのOSS互換として語られることが多いですが、セルフホスト以外にもhttps://supabase.com で無料枠でサービス運営を始めることができます。
+用意されているDBがPostgreSQLを用いているので、高速なインデックスも利用できます。
+Edge Functionsのサーバレス基盤も人気です。
+(サービスの仕様上、デフォルトの設定で、クライアントサイドから操作できる範囲が広いので、セキュリティを考慮する必要があります。)
 
 ---
 
-## Jamstackという考え方
+
+
+# アイディア例
 
 ---
 
-おまけ (アイディアなど)
+## PLATEAUのデータを使っていろいろ...
+
+データのコンバータが公開されており、glTFに変換するとWebベースの3Dオブジェクトとして取り回しがしやすいです。
+
+一定範囲のみ必要であればBlenderで矩形で切り取りましょう。
+
+![bg right](./assets/image3.png)
+
+
 
 ---
 
-PLATEAUのデータを使っていろいろ...
+### マインクラフトに変換する
+https://github.com/Project-PLATEAU/plateau2minecraft
 
-* マインクラフトに変換する
-
-
----
-
-![alt text](./assets/image3.png)
 
 ---
 
@@ -433,7 +708,7 @@ PLATEAUのデータを使っていろいろ...
 
 ---
 
-### 一番大きいニュース
+## 一番大きいニュース
 
 [AlphaEarth Foundations helps map our planet in unprecedented detail - Google DeepMind](https://deepmind.google/discover/blog/alphaearth-foundations-helps-map-our-planet-in-unprecedented-detail/)
 
@@ -514,6 +789,11 @@ ReSend / SendGrid
 [Software Design総集編【2018～2023】 | 技術評論社](https://gihyo.jp/book/2024/978-4-297-14471-5)
 
 
+[Amazon.co.jp: FOSS4G HANDBOOK（フォスフォージーハンドブック） : OSGeo財団, 森亮（OSGeo財団日本代表）: 本](http://amazon.jp/dp/4759101314/creazynet-22/ref=nosim/)
+
+
+[Pythonによる地理空間データ分析 - O'Reilly Japan](https://www.oreilly.co.jp/books/9784814400324/)
+
 
 ---
 
@@ -525,3 +805,102 @@ ReSend / SendGrid
 非常に人手がかかる作業で、関わられる会社さんが増えることを応援しています。
 
 [PLATEAUアカデミー | (一社)社会基盤情報流通推進協議会](https://aigid.jp/plateauacademy/)
+
+---
+
+## オリジンとは？
+
+
+通常、https://example.com:443 と https://example.com:8080 はそれぞれ別のオリジンと見なされ、あるオリジンに存在するリソースを、悪意あるスクリプトが別のオリジンから読み取ろうとすることを防ぐ仕組みがブラウザには存在しています。
+
+---
+
+## JAMStackという考え方
+
+講義でお伝えしたフロントエンドに関わる概念は、概ねJAMStackに則っています。
+ある種のアーキテクチャ、アプローチと言えるでしょう。
+
+JAMStackのJAMはJavaScript/APIs/Markup から成り立ちます。
+
+
+[Jamstackって何なの？何がいいの？ #JavaScript - Qiita](https://qiita.com/ozaki25/items/4075d03278d1fb51cc37)
+
+以下のような便利ツールも推進団体が作っています。
+[Static Site Generators - Top Open Source SSGs | Jamstack](https://jamstack.org/generators/)
+
+---
+
+各要素をまとめるとこのような感じになるでしょうか？
+
+```
+JAMSTACKアーキテクチャ
+├─ JavaScript
+│   ├─ クライアントサイドの動的な機能
+│   ├─ フロントエンドフレームワーク
+│   │   ├─ React
+│   │   ├─ Vue
+│   │   └─ Svelte
+│   └─ シングルページアプリケーション（SPA）の構築
+├─ APIs
+│   ├─ サーバーレス関数
+│   ├─ RESTful API
+│   ├─ GraphQL
+│   └─ 外部サービスとの連携
+├─ Markdown
+│   ├─ コンテンツ管理
+│   ├─ 静的サイトジェネレーター
+│   │   ├─ Gatsby
+│   │   ├─ Next.js
+│   │   └─ Hugo
+│   └─ コンテンツの構造化と管理
+└─ Static Site
+    ├─ プリレンダリングされた静的HTML
+    ├─ CDNでのホスティング
+    ├─ 高速なロード時間
+    └─ セキュリティの向上
+```
+
+---
+
+<p class="tiny-text">動的なフロントエンドとは何か、とメモしておくと、以下のような要素が当てはまるでしょう。</p>
+
+```markdown
+# インタラクティブな要素
+フォームのリアルタイムバリデーション
+ドラッグ&ドロップ機能
+モーダルウィンドウの表示/非表示
+# データの動的な更新
+無限スクロール
+リアルタイム検索結果の表示
+ページ遷移なしでのコンテンツ更新
+ユーザーインターフェース
+タブの切り替え
+アコーディオンメニュー
+スライダー/カルーセル
+# 状態管理
+ショッピングカートの更新
+ユーザー認証状態の管理
+フィルターや並び替え機能
+# リアルタイム機能
+チャットアプリケーション
+通知システム
+リアルタイム共同編集
+# アニメーション
+スムーズなトランジション
+スクロールエフェクト
+インタラクティブな要素のアニメーション
+```
+
+---
+
+
+## ポート転送の補足
+最近のトレンドだとVPNも含めたトンネル網として[Tailscale · Best VPN Service for Secure Networks](https://tailscale.com/)の利用が流行っているようです。
+
+
+---
+
+## コンテナの補足
+
+DockerDesktopの代替としては、OrbStack、Limaが人気があります。
+AWSがFinchをかつて作っていたようですが...
