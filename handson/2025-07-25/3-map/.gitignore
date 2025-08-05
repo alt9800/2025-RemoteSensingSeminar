@@ -1,0 +1,12 @@
+node_modules/
+.env
+.DS_Store
+*.log
+
+
+# アップロードファイル
+/uploads/*
+!/uploads/.gitkeep
+
+# データベース
+/db/*.db
