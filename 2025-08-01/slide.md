@@ -484,6 +484,9 @@ https://github.com/alt9800/2025-RemoteSensingSeminar/tree/main/2025-08-01/handso
 
 #### Dockerコンテナのサイズ 
 シングルバイナリにビルドできるような実行環境(Goなど)が相性がよく、一方でJVMのようなインタープリタを実行する環境が少し相性が良くないと感じます。
+
+---
+
 #### ビルドイメージ
 arm CPUを積んだPCが増えてきているので注意しておくと、コンテナを登録する(アップロードする)レジストリがx86_64アーキテクチャである場合、そのままarm64やM1 Macなどでビルドしただけでは動作しません。
 そのため、Dockerコンテナをビルドする際に明示的にx86_64を指定してあげましょう。
@@ -492,7 +495,7 @@ arm CPUを積んだPCが増えてきているので注意しておくと、コ�
 
 ---
 
-基本的にはDockerは**「PCごとの実行環境の差分を吸収してくれる」**ための仮想化環境である、と説明していましたが、
+基本的にはDockerは **「PCごとの実行環境の差分を吸収してくれる」** ための仮想化環境である、と説明していましたが、
 実際にはホストマシン側のリソースを利用して計算を行っている都合上、CPUアーキテクチャが違うと命令セットが違うため、それぞれのCPUに最適化されたコンテナでは利用するカーネルで混乱してしまい実行がなされません。
 
 ```
@@ -532,8 +535,8 @@ https://secure.sakura.ad.jp/cloud/iaas/#!/appliance/containerregistry/
 
 ---
 
-[Readme](./handson/expressonDocker/README.md)にも記載していますが、AppRunで動くコンテナはレジストリに登録しておく必要があり、
-講義のコード群だと以下のようなコマンドを用いてコンテナをビルドし、AppRunのレジストリにコンテナをアップロードします。
+https://github.com/alt9800/2025-RemoteSensingSeminar/tree/main/2025-08-01/handson/expressonDocker
+にも記載していますが、AppRunで動くコンテナはレジストリに登録しておく必要があり、講義のコード群だと以下のようなコマンドを用いてコンテナをビルドし、AppRunのレジストリにコンテナをアップロードします。
 
 ```
 ## さくらのコンテナレジストリの場合
@@ -574,7 +577,7 @@ export TAG="v1.0.0"
 2.032 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
 ```
 
-→ `npm ci --only=production` を `npm install` に変更<br>もしくは、npm installを事前にかけて置くとciを突破できる模様です。
+→ `npm ci --only=production` を `npm install` に変更<br>もしくは、`npm install`実行しておくとCIに引っかかりません。
 
 
 ---
