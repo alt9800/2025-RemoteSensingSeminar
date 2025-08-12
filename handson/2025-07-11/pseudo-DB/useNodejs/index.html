@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道路陥没記録（最小版）</title>
+    <script src="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        .panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        button {
+            padding: 8px 16px;
+            margin: 2px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .add { background: #007bff; color: white; }
+        .clear { background: #dc3545; color: white; }
+        button:hover { opacity: 0.8; }
+        
+        .info { font-size: 12px; margin-top: 5px; }
+        .popup { font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="panel">
+        <button class="add" onclick="startAdding()">📍 追加</button>
+        <button class="clear" onclick="clearAll()">🗑️ 全削除</button>
+        <div class="info">記録数: <span id="count">0</span></div>
+    </div>
+    
+    <script>
+        let map, adding = false;
+        
+        // API呼び出し
+        const api = {
+            get: () => fetch('/api/potholes').then(r => r.json()),
+            add: (data) => fetch('/api/potholes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }),
+            delete: (id) => fetch(`/api/potholes/${id}`, { method: 'DELETE' }),
+            clear: () => fetch('/api/clear', { method: 'DELETE' })
+        };
+        
+        // データ読み込み
+        async function loadData() {
+            const data = await api.get();
+            map.getSource('potholes').setData(data);
+            document.getElementById('count').textContent = data.features.length;
+        }
+        
+        // 記録追加開始
+        function startAdding() {
+            adding = true;
+            map.getCanvas().style.cursor = 'crosshair';
+        }
+        
+        // 全削除
+        async function clearAll() {
+            if (confirm('全て削除しますか？')) {
+                await api.clear();
+                loadData();
+            }
+        }
+        
+        // 個別削除
+        window.remove = async (id) => {
+            await api.delete(id);
+            loadData();
+        };
+        
+        // 地図初期化
+        map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+            center: [139.7, 35.7],
+            zoom: 10
+        });
+        
+        map.addControl(new maplibregl.NavigationControl());
+        
+        map.on('load', () => {
+            map.addSource('potholes', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+            
+            map.addLayer({
+                id: 'potholes',
+                type: 'circle',
+                source: 'potholes',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#ff0000',
+                    'circle-stroke-color': '#fff',
+                    'circle-stroke-width': 2
+                }
+            });
+            
+            loadData();
+        });
+        
+        // クリックで追加
+        map.on('click', async (e) => {
+            if (!adding) return;
+            adding = false;
+            map.getCanvas().style.cursor = '';
+            
+            const desc = prompt('説明（任意）:') || '';
+            await api.add({
+                coordinates: [e.lngLat.lng, e.lngLat.lat],
+                description: desc
+            });
+            loadData();
+        });
+        
+        // ポイントクリックでポップアップ
+        map.on('click', 'potholes', (e) => {
+            const p = e.features[0].properties;
+            new maplibregl.Popup()
+                .setLngLat(e.features[0].geometry.coordinates)
+                .setHTML(`
+                    <div class="popup">
+                        ${new Date(p.timestamp).toLocaleString('ja-JP')}<br>
+                        ${p.description || '説明なし'}<br>
+                        <button onclick="remove('${p.id}')">削除</button>
+                    </div>
+                `)
+                .addTo(map);
+        });
+        
+        map.on('mouseenter', 'potholes', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'potholes', () => {
+            map.getCanvas().style.cursor = '';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>GeoJSON Map with Drag and Drop</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #drop-area {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border: 2px dashed #333;
+            border-radius: 5px;
+        }
+        #drop-area.dragover {
+            background: rgba(200, 200, 200, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div id="drop-area">GeoJSONファイルをここにドラッグアンドドロップ</div>
+    <div id="map"></div>
+
+    <script>
+        // 地図の初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+            center: [132.07, 34.44], // 初期中心（提供されたGeoJSONの座標に基づく）
+            zoom: 12
+        });
+
+        // ナビゲーションコントロールの追加
+        map.addControl(new maplibregl.NavigationControl());
+
+        // デフォルトのGeoJSONデータ
+        const defaultGeoJSON = {
+            "type": "FeatureCollection",
+            "name": "緊急輸送道路（1次国道県道）",
+            "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "路線名": "中国縦貫自動車道",
+                        "延長_km": 132.8,
+                        "道路種別": "高速自動車国道",
+                        "路線番号": null,
+                        "路線区分": "1次"
+                    },
+                    "geometry": {
+                        "type": "MultiLineString",
+                        "coordinates": [
+                            [
+                                [132.080657491898108, 34.444092947171917],
+                                [132.074167602154546, 34.441059047797623],
+                                [132.072904919961104, 34.440501611333595],
+                                [132.072410974646175, 34.440290751479743],
+                                [132.072024880243163, 34.440111689328546],
+                                [132.071614462503192, 34.439900890866141],
+                                [132.071151904101526, 34.43963815109317],
+                                [132.070818049955648, 34.439430293014382],
+                                [132.070529442058699, 34.439219586308816],
+                                [132.07017830998376, 34.438907914452585],
+                                [132.069948883418903, 34.438682836594552],
+                                [132.069747271992327, 34.438480846668014],
+                                [132.069517931172982, 34.438183685801221],
+                                [132.069305978818733, 34.43789807149804],
+                                [132.069170524993666, 34.437667300348274],
+                                [132.069045550547912, 34.437403379565346],
+                                [132.068996086850007, 34.437294495849365],
+                                [132.068931861751167, 34.437161092344255],
+                                [132.068880670093563, 34.437027688839145]
+                            ]
+                        ]
+                    }
+                }
+            ]
+        };
+
+        // 地図がロードされたらデフォルトのGeoJSONを表示
+        map.on('load', () => {
+            map.addSource('route', {
+                'type': 'geojson',
+                'data': defaultGeoJSON
+            });
+
+            map.addLayer({
+                'id': 'route',
+                'type': 'line',
+                'source': 'route',
+                'layout': {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                'paint': {
+                    'line-color': '#FF0000',
+                    'line-width': 4
+                }
+            });
+        });
+
+        // ドラッグアンドドロップの処理
+        const dropArea = document.getElementById('drop-area');
+
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.geojson')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const newGeoJSON = JSON.parse(event.target.result);
+                        // 既存のデータソースを更新
+                        map.getSource('route').setData(newGeoJSON);
+                        // 地図の中心を新しいGeoJSONの最初の座標に更新
+                        const coordinates = newGeoJSON.features[0].geometry.coordinates[0][0];
+                        map.setCenter(coordinates);
+                    } catch (err) {
+                        alert('GeoJSONファイルの解析に失敗しました: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                alert('GeoJSONファイルを選択してください');
+            }
+        });
+    </script>
+</body>
+</html>

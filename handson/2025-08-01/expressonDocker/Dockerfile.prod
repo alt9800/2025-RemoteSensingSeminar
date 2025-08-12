@@ -1,0 +1,43 @@
+# マルチステージビルドで最適化
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 依存関係のキャッシュを活用
+COPY package*.json ./
+RUN npm ci --only=production
+
+# 開発依存関係を別レイヤーでインストール
+RUN npm ci
+
+# アプリケーションファイルをコピー
+COPY . .
+
+# 本番用イメージ
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 本番用の依存関係のみコピー
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+
+# アプリケーションファイルをコピー
+COPY . .
+
+# 必要なディレクトリを作成
+RUN mkdir -p uploads public/css public/js public/login public/signup public/mypage && \
+    chown -R node:node /app
+
+# セキュリティのため非rootユーザーで実行
+USER node
+
+# ヘルスチェック
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+# ポート公開
+EXPOSE 3000
+
+# 本番環境では node を直接使用
+CMD ["node", "src/server.js"]
