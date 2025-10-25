@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: field-survey-app:local
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fieldsurvey
+      - DB_USER=fielduser
+      - DB_PASSWORD=fieldpass123
+      - SESSION_SECRET=your-secret-key-here-change-in-production
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./uploads:/app/uploads
+      - /app/node_modules
+    depends_on:
+      - postgres
+    command: npm run dev
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=fieldsurvey
+      - POSTGRES_USER=fielduser
+      - POSTGRES_PASSWORD=fieldpass123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:

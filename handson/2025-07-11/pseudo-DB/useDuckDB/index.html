@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道路陥没記録（DuckDB WASM版）</title>
+    <script src="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        .panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            max-width: 280px;
+        }
+        
+        h3 { margin: 0 0 10px 0; font-size: 16px; }
+        
+        button {
+            padding: 8px 16px;
+            margin: 4px 2px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .add { background: #007bff; color: white; }
+        .export { background: #28a745; color: white; }
+        .query { background: #17a2b8; color: white; }
+        .clear { background: #dc3545; color: white; }
+        button:hover { opacity: 0.8; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .info { 
+            font-size: 12px; 
+            margin-top: 10px; 
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 3px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            display: none;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.loading { background: #cce5ff; color: #004085; }
+        
+        .popup { font-size: 12px; }
+        .popup button { 
+            margin-top: 5px; 
+            padding: 4px 8px; 
+            font-size: 11px; 
+        }
+        
+        .query-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            max-width: 300px;
+            display: none;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 80px;
+            margin: 5px 0;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .query-result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 3px;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        th, td {
+            padding: 4px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        
+        th {
+            background: #e9ecef;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="panel">
+        <h3>🦆 DuckDB道路陥没記録</h3>
+        <button class="add" onclick="startAdding()" id="addBtn">📍 記録追加</button>
+        <button class="export" onclick="exportGeoJSON()" id="exportBtn">📥 GeoJSON出力</button>
+        <button class="query" onclick="toggleQueryPanel()" id="queryBtn">🔍 SQL実行</button>
+        <button class="clear" onclick="clearAll()" id="clearBtn">🗑️ 全削除</button>
+        <div class="info">
+            <div>記録数: <span id="count">0</span></div>
+            <div>DB状態: <span id="dbStatus">初期化中...</span></div>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+    
+    <div class="query-panel" id="queryPanel">
+        <h3>SQL クエリ実行</h3>
+        <textarea id="sqlInput" placeholder="SELECT * FROM potholes ORDER BY timestamp DESC LIMIT 10">SELECT * FROM potholes ORDER BY timestamp DESC LIMIT 10</textarea>
+        <button onclick="executeQuery()">実行</button>
+        <button onclick="toggleQueryPanel()">閉じる</button>
+        <div class="query-result" id="queryResult"></div>
+    </div>
+    
+    <script type="module">
+        // ESモジュールとしてDuckDBをインポート
+        import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.1-dev106.0/+esm';
+        
+        let map, db, conn, adding = false;
+        
+        // グローバル関数として公開
+        window.startAdding = startAdding;
+        window.exportGeoJSON = exportGeoJSON;
+        window.toggleQueryPanel = toggleQueryPanel;
+        window.clearAll = clearAll;
+        window.executeQuery = executeQuery;
+        window.removePothole = removePothole;
+        
+        // ボタンの有効/無効を制御
+        function setButtonsEnabled(enabled) {
+            document.getElementById('addBtn').disabled = !enabled;
+            document.getElementById('exportBtn').disabled = !enabled;
+            document.getElementById('queryBtn').disabled = !enabled;
+            document.getElementById('clearBtn').disabled = !enabled;
+        }
+        
+        // ステータス表示
+        function showStatus(msg, type = 'success') {
+            const status = document.getElementById('status');
+            status.textContent = msg;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            if (type !== 'loading') {
+                setTimeout(() => status.style.display = 'none', 3000);
+            }
+        }
+        
+        // DuckDB初期化
+        async function initDuckDB() {
+            showStatus('DuckDBを初期化中...', 'loading');
+            setButtonsEnabled(false);
+            
+            try {
+                // バンドルを取得
+                const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+                const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+                
+                // CORS問題を回避するWorker作成
+                const worker_url = URL.createObjectURL(
+                    new Blob([`importScripts("${bundle.mainWorker}");`], {
+                        type: "text/javascript",
+                    })
+                );
+                
+                const worker = new Worker(worker_url);
+                const logger = new duckdb.ConsoleLogger();
+                db = new duckdb.AsyncDuckDB(logger, worker);
+                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+                URL.revokeObjectURL(worker_url);
+                
+                conn = await db.connect();
+                
+                // テーブル作成
+                await conn.query(`
+                    CREATE TABLE IF NOT EXISTS potholes (
+                        id VARCHAR PRIMARY KEY,
+                        lon DOUBLE NOT NULL,
+                        lat DOUBLE NOT NULL,
+                        description VARCHAR,
+                        timestamp TIMESTAMP NOT NULL
+                    )
+                `);
+                
+                document.getElementById('dbStatus').textContent = '接続済み';
+                showStatus('DuckDBの初期化完了', 'success');
+                setButtonsEnabled(true);
+                
+                await loadData();
+                
+            } catch (error) {
+                console.error('DuckDB初期化エラー:', error);
+                document.getElementById('dbStatus').textContent = 'エラー';
+                showStatus('DuckDB初期化失敗: ' + error.message, 'error');
+                
+                // フォールバック：メモリ内配列を使用
+                useFallbackStorage();
+            }
+        }
+        
+        // フォールバック（DuckDBが使えない場合）
+        let fallbackData = [];
+        function useFallbackStorage() {
+            showStatus('シンプルモードで動作します', 'success');
+            document.getElementById('dbStatus').textContent = 'シンプルモード';
+            setButtonsEnabled(true);
+            
+            // SQLボタンは無効化
+            document.getElementById('queryBtn').disabled = true;
+            
+            window.conn = {
+                query: async (sql) => {
+                    // 簡易的なSQLパーサー
+                    if (sql.includes('INSERT')) {
+                        const match = sql.match(/VALUES \('([^']+)', ([\d.-]+), ([\d.-]+), '([^']*)', '([^']+)'\)/);
+                        if (match) {
+                            fallbackData.push({
+                                id: match[1],
+                                lon: parseFloat(match[2]),
+                                lat: parseFloat(match[3]),
+                                description: match[4],
+                                timestamp: new Date(match[5])
+                            });
+                        }
+                    } else if (sql.includes('DELETE FROM potholes WHERE')) {
+                        const match = sql.match(/id = '([^']+)'/);
+                        if (match) {
+                            fallbackData = fallbackData.filter(d => d.id !== match[1]);
+                        }
+                    } else if (sql.includes('DELETE FROM potholes')) {
+                        fallbackData = [];
+                    }
+                    
+                    return {
+                        toArray: () => fallbackData
+                    };
+                }
+            };
+            conn = window.conn;
+            
+            loadData();
+        }
+        
+        // データ読み込み
+        async function loadData() {
+            try {
+                const result = await conn.query(`
+                    SELECT id, lon, lat, description, timestamp 
+                    FROM potholes 
+                    ORDER BY timestamp DESC
+                `);
+                
+                const rows = result.toArray();
+                const features = rows.map(row => ({
+                    type: 'Feature',
+                    id: row.id,
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [row.lon, row.lat]
+                    },
+                    properties: {
+                        id: row.id,
+                        description: row.description,
+                        timestamp: row.timestamp instanceof Date ? row.timestamp.toISOString() : row.timestamp
+                    }
+                }));
+                
+                map.getSource('potholes').setData({
+                    type: 'FeatureCollection',
+                    features: features
+                });
+                
+                document.getElementById('count').textContent = features.length;
+                
+            } catch (error) {
+                console.error('データ読み込みエラー:', error);
+            }
+        }
+        
+        // 記録追加
+        function startAdding() {
+            adding = true;
+            map.getCanvas().style.cursor = 'crosshair';
+            showStatus('地図をクリックして位置を選択', 'loading');
+        }
+        
+        // 全削除
+        async function clearAll() {
+            if (!confirm('全てのデータを削除しますか？')) return;
+            
+            try {
+                await conn.query('DELETE FROM potholes');
+                await loadData();
+                showStatus('全データを削除しました', 'success');
+            } catch (error) {
+                showStatus('削除エラー: ' + error.message, 'error');
+            }
+        }
+        
+        // 個別削除
+        async function removePothole(id) {
+            try {
+                await conn.query(`DELETE FROM potholes WHERE id = '${id}'`);
+                await loadData();
+                showStatus('削除しました', 'success');
+            } catch (error) {
+                showStatus('削除エラー: ' + error.message, 'error');
+            }
+        }
+        
+        // GeoJSONエクスポート
+        async function exportGeoJSON() {
+            try {
+                const result = await conn.query(`
+                    SELECT id, lon, lat, description, timestamp 
+                    FROM potholes 
+                    ORDER BY timestamp DESC
+                `);
+                
+                const rows = result.toArray();
+                const geojson = {
+                    type: 'FeatureCollection',
+                    features: rows.map(row => ({
+                        type: 'Feature',
+                        id: row.id,
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [row.lon, row.lat]
+                        },
+                        properties: {
+                            id: row.id,
+                            description: row.description,
+                            timestamp: row.timestamp instanceof Date ? row.timestamp.toISOString() : row.timestamp
+                        }
+                    }))
+                };
+                
+                const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `potholes_${new Date().toISOString().split('T')[0]}.geojson`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showStatus('GeoJSONをエクスポートしました', 'success');
+            } catch (error) {
+                showStatus('エクスポートエラー: ' + error.message, 'error');
+            }
+        }
+        
+        // SQLクエリパネル切り替え
+        function toggleQueryPanel() {
+            const panel = document.getElementById('queryPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // SQLクエリ実行
+        async function executeQuery() {
+            const sql = document.getElementById('sqlInput').value;
+            const resultDiv = document.getElementById('queryResult');
+            
+            try {
+                const result = await conn.query(sql);
+                const rows = result.toArray();
+                
+                if (rows.length === 0) {
+                    resultDiv.innerHTML = '<p>結果なし</p>';
+                    return;
+                }
+                
+                // テーブル作成
+                let html = '<table><thead><tr>';
+                const columns = Object.keys(rows[0]);
+                columns.forEach(col => html += `<th>${col}</th>`);
+                html += '</tr></thead><tbody>';
+                
+                rows.forEach(row => {
+                    html += '<tr>';
+                    columns.forEach(col => {
+                        let value = row[col];
+                        if (value instanceof Date) {
+                            value = value.toLocaleString('ja-JP');
+                        }
+                        html += `<td>${value ?? ''}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                resultDiv.innerHTML = html;
+                
+                if (!sql.trim().toUpperCase().startsWith('SELECT')) {
+                    await loadData();
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">エラー: ${error.message}</p>`;
+            }
+        }
+        
+        // 地図初期化
+        map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json',
+            center: [139.7, 35.7],
+            zoom: 10
+        });
+        
+        map.addControl(new maplibregl.NavigationControl());
+        map.addControl(new maplibregl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: true
+        }));
+        
+        map.on('load', async () => {
+            map.addSource('potholes', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+            
+            map.addLayer({
+                id: 'potholes',
+                type: 'circle',
+                source: 'potholes',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#ff0000',
+                    'circle-stroke-color': '#fff',
+                    'circle-stroke-width': 2
+                }
+            });
+            
+            await initDuckDB();
+        });
+        
+        // クリックで追加
+        map.on('click', async (e) => {
+            if (!adding || !conn) return;
+            adding = false;
+            map.getCanvas().style.cursor = '';
+            document.getElementById('status').style.display = 'none';
+            
+            const desc = prompt('説明（任意）:') || '';
+            const id = Date.now().toString();
+            const timestamp = new Date().toISOString();
+            
+            try {
+                await conn.query(`
+                    INSERT INTO potholes (id, lon, lat, description, timestamp) 
+                    VALUES ('${id}', ${e.lngLat.lng}, ${e.lngLat.lat}, '${desc.replace(/'/g, "''")}', '${timestamp}')
+                `);
+                await loadData();
+                showStatus('記録を追加しました', 'success');
+            } catch (error) {
+                console.error('追加エラー:', error);
+                showStatus('追加エラー: ' + error.message, 'error');
+            }
+        });
+        
+        // ポイントクリックでポップアップ
+        map.on('click', 'potholes', (e) => {
+            e.stopPropagation();
+            const p = e.features[0].properties;
+            const timestamp = new Date(p.timestamp).toLocaleString('ja-JP');
+            
+            new maplibregl.Popup()
+                .setLngLat(e.features[0].geometry.coordinates)
+                .setHTML(`
+                    <div class="popup">
+                        <strong>記録日時:</strong> ${timestamp}<br>
+                        <strong>説明:</strong> ${p.description || 'なし'}<br>
+                        <button onclick="removePothole('${p.id}')">削除</button>
+                    </div>
+                `)
+                .addTo(map);
+        });
+        
+        map.on('mouseenter', 'potholes', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'potholes', () => {
+            map.getCanvas().style.cursor = '';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フィールド調査システム</title>
+    
+    <!-- MapLibre GL JS -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    
+    <!-- 共通スタイル -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-container">
+            <h1 class="header-title">
+                <a href="/">フィールド調査システム</a>
+            </h1>
+            <nav class="header-nav">
+                <div id="nav-not-logged-in" class="nav-group" style="display: none;">
+                    <a href="/login/" class="btn btn-outline">ログイン</a>
+                    <a href="/signup/" class="btn btn-primary">サインアップ</a>
+                </div>
+                <div id="nav-logged-in" class="nav-group" style="display: none;">
+                    <span class="username" id="current-username"></span>
+                    <a href="/mypage/" class="btn btn-outline">マイページ</a>
+                    <button id="logout-btn" class="btn btn-danger">ログアウト</button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="main-container">
+        <!-- 地図エリア -->
+        <div id="map" class="map-container"></div>
+        
+        <!-- サイドパネル -->
+        <aside class="side-panel">
+            <h2>投稿一覧</h2>
+            <div id="posts-list" class="posts-list">
+                <p class="loading">読み込み中...</p>
+            </div>
+        </aside>
+    </main>
+
+    <!-- 投稿モーダル -->
+    <div id="post-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>新規投稿</h2>
+            <form id="post-form">
+                <div class="form-group">
+                    <label>位置情報</label>
+                    <p>緯度: <span id="modal-lat"></span></p>
+                    <p>経度: <span id="modal-lng"></span></p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="post-comment">コメント</label>
+                    <textarea id="post-comment" rows="4" maxlength="1000" placeholder="場所の説明や観察内容を入力してください"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="post-image">画像</label>
+                    <input type="file" id="post-image" accept="image/jpeg,image/jpg,image/png,image/gif">
+                    <div id="image-preview" class="image-preview"></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" id="cancel-post">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">投稿する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 共通スクリプト -->
+    <script src="/js/common.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/map.js"></script>
+</body>
+</html>

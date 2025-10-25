@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シンプルなAPI呼び出し例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        h1, h2 {
+            color: #333;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .section {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .error {
+            color: red;
+            background-color: #ffe6e6;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>フロントエンドAPI呼び出しの基本例</h1>
+    
+    <!-- Dog API Section -->
+    <div class="section">
+        <h2>🐕 Dog API - ランダムな犬の画像</h2>
+        <p>Dog APIからランダムな犬の画像を取得します。</p>
+        <button id="fetchDogBtn">犬の画像を取得</button>
+        <div id="dogResult" class="result"></div>
+    </div>
+
+    <!-- Lorem Picsum API Section -->
+    <div class="section">
+        <h2>📸 Lorem Picsum API - ランダムな画像</h2>
+        <p>Lorem Picsum APIからランダムな画像を取得します。</p>
+        <button id="fetchPicsumBtn">ランダム画像を取得</button>
+        <div id="picsumResult" class="result"></div>
+    </div>
+
+    <script>
+        // Dog API - ランダムな犬の画像を取得
+        function fetchDogImage() {
+            const resultDiv = document.getElementById('dogResult');
+            const button = document.getElementById('fetchDogBtn');
+            
+            // ボタンを無効化し、ローディング表示
+            button.disabled = true;
+            resultDiv.innerHTML = '<p class="loading">画像を取得中...</p>';
+            
+            // APIを呼び出し
+            fetch('https://dog.ceo/api/breeds/image/random')
+                .then(response => {
+                    // レスポンスをJSONに変換
+                    return response.json();
+                })
+                .then(data => {
+                    // データを処理
+                    if (data.status === 'success') {
+                        resultDiv.innerHTML = `
+                            <p>取得成功！</p>
+                            <img src="${data.message}" alt="ランダムな犬の画像">
+                            <p><strong>画像URL:</strong> ${data.message}</p>
+                        `;
+                    } else {
+                        throw new Error('APIからの応答が正常ではありません');
+                    }
+                })
+                .catch(error => {
+                    // エラーハンドリング
+                    resultDiv.innerHTML = `<p class="error">エラーが発生しました: ${error.message}</p>`;
+                    console.error('Dog API エラー:', error);
+                })
+                .finally(() => {
+                    // ボタンを再度有効化
+                    button.disabled = false;
+                });
+        }
+
+        // Lorem Picsum API - ランダムな画像を取得
+        function fetchPicsumImage() {
+            const resultDiv = document.getElementById('picsumResult');
+            const button = document.getElementById('fetchPicsumBtn');
+            
+            // ボタンを無効化し、ローディング表示
+            button.disabled = true;
+            resultDiv.innerHTML = '<p class="loading">画像を生成中...</p>';
+            
+            // ランダムなIDを生成（1-1000の範囲）
+            const randomId = Math.floor(Math.random() * 1000) + 1;
+            const imageUrl = `https://picsum.photos/400/300?random=${randomId}`;
+            
+            // 画像の読み込みを確認するため、新しいImageオブジェクトを作成
+            const img = new Image();
+            
+            img.onload = function() {
+                // 画像の読み込みが成功した時
+                resultDiv.innerHTML = `
+                    <p>画像生成成功！</p>
+                    <img src="${imageUrl}" alt="ランダムな画像">
+                    <p><strong>画像URL:</strong> ${imageUrl}</p>
+                    <p><strong>画像ID:</strong> ${randomId}</p>
+                `;
+                button.disabled = false;
+            };
+            
+            img.onerror = function() {
+                // 画像の読み込みが失敗した時
+                resultDiv.innerHTML = `<p class="error">画像の読み込みに失敗しました</p>`;
+                console.error('Lorem Picsum 画像読み込みエラー');
+                button.disabled = false;
+            };
+            
+            // 画像のsrcを設定（読み込み開始）
+            img.src = imageUrl;
+        }
+
+        // イベントリスナーを設定
+        document.getElementById('fetchDogBtn').addEventListener('click', fetchDogImage);
+        document.getElementById('fetchPicsumBtn').addEventListener('click', fetchPicsumImage);
+
+        // ページ読み込み時にDog APIを実行（デモ用）
+        window.addEventListener('load', function() {
+            console.log('ページが読み込まれました');
+            fetchDogImage();
+        });
+    </script>
+</body>
+</html>
